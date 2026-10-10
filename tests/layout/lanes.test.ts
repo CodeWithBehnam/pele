@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cnode, type CEdge, type CNode, type Dir } from '../../src/layout/compound.js';
 import { laneLayout } from '../../src/layout/lanes.js';
+import { endSide } from '../../src/svg/shapes.js';
 import { random } from '../support/corpus.js';
 
 const OPTIONS = { nodeSep: 40, edgeSep: 16, rankSep: 48, portSep: 20 };
@@ -124,6 +125,32 @@ describe('lane layout', () => {
     laneLayout(nodes, edges, 'TB', OPTIONS);
     expect(nodes[0].x).toBeCloseTo(nodes[1].x, 6);
     expect(nodes[1].x).toBeCloseTo(nodes[2].x, 6);
+  });
+
+  it.each(DIRS)('separates an approval decision’s incoming, accepted and returned paths in %s', (dir) => {
+    const nodes = [cnode(60, 40), cnode(80, 40), cnode(70, 70), cnode(80, 40), cnode(80, 40), cnode(60, 40), group(), group(), group()];
+    nodes[0].parent = nodes[5].parent = 8;
+    nodes[1].parent = nodes[2].parent = 7;
+    nodes[3].parent = nodes[4].parent = 6;
+    const edges = [edge(0, 1, 70, 20), edge(1, 2), edge(2, 3, 50, 20), edge(3, 4), edge(4, 5), edge(2, 0, 70, 20)];
+    laneLayout(nodes, edges, dir, OPTIONS);
+    const incoming = endSide(edges[1].route, edges[1].route.length - 3, nodes[2]);
+    const accepted = endSide(edges[2].route, 0, nodes[2]);
+    const returned = endSide(edges[5].route, 0, nodes[2]);
+    expect(new Set([incoming, accepted, returned]).size).toBe(3);
+    expect([incoming, accepted, returned]).not.toContain(-1);
+    expect(edges[5].route.length).toBe(9);
+    // Every segment of the return is orthogonal, and its label clears every step.
+    const back = edges[5];
+    for (let p = 3; p < back.route.length; p += 3) {
+      expect(back.route[p] === back.route[p - 3] || back.route[p + 1] === back.route[p - 2]).toBe(true);
+    }
+    for (const node of nodes.slice(0, 6)) {
+      const [l, t, r, b] = box(node);
+      const clear = back.labelX + back.labelW / 2 <= l || back.labelX - back.labelW / 2 >= r ||
+        back.labelY + back.labelH / 2 <= t || back.labelY - back.labelH / 2 >= b;
+      expect(clear).toBe(true);
+    }
   });
 
   it.each([24, 12])('keeps random graphs well formed with %i pixels of lane padding', (lanePad) => {

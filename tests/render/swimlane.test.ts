@@ -148,6 +148,30 @@ describe('swimlane rendering', () => {
     expect(svgOf(source, { maxWidth: 160 })).toContain('rotate(-90 ');
   });
 
+  it('draws the changes branch from a separate side of the approval decision', () => {
+    const source = examples[9];
+    for (const maxWidth of [undefined, 320]) {
+      const svg = svgOf(source, { maxWidth });
+      const [cx, cy] = centers(svg).get('decide')!;
+      const start = (id: string): [number, number] => {
+        const m = new RegExp(`data-id="${id}"><path d="M([-\\d.]+),([-\\d.]+)`).exec(svg)!;
+        return [Number(m[1]), Number(m[2])];
+      };
+      const accepted = start('L_decide_create_0'), returned = start('L_decide_apply_0');
+      if (maxWidth === undefined) {
+        expect(accepted[0]).toBe(cx);
+        expect(returned[0]).toBe(cx);
+        expect(accepted[1]).toBeGreaterThan(cy);
+        expect(returned[1]).toBeLessThan(cy);
+      } else {
+        expect(accepted[1]).toBe(cy);
+        expect(returned[1]).toBe(cy);
+        expect(accepted[0]).toBeGreaterThan(cx);
+        expect(returned[0]).toBeLessThan(cx);
+      }
+    }
+  });
+
   it('retains nested groups, unnamed and empty lanes, styled nodes, links and self-loops after turning', () => {
     const source = '---\ntitle: Delivery\n---\nswimlane-beta LR\naccTitle: Accessible delivery\naccDescr: Delivery process\nstart --> a\nsubgraph Team\n subgraph Inner\n a{Ready?} --> b[(Store)]\n b --> b\n end\n c --> d --> e\nend\nsubgraph Empty\nend\nb --> c\nclick a "https://example.com"\nstyle a fill:#f00\nclassDef hot stroke:#0f0\nclass b hot';
     const wide = render(source, options), narrow = render(source, { ...options, maxWidth: 320 });

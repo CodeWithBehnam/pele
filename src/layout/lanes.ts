@@ -10,6 +10,7 @@ const LANE_PAD = 24;
 const SWEEPS = 8;
 const MAX_DUMMIES = 20000;
 const MAX_HOPS = 10000;
+const ROUTE_BUDGET = 2000000;
 
 export function laneLayout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: LayeredOptions, lanePad = LANE_PAD): CompoundResult {
   const n = nodes.length;
@@ -377,6 +378,85 @@ export function laneLayout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: Layere
     } else {
       out.labelX = (route[0] + route[route.length - 3]) / 2;
       out.labelY = (route[1] + route[route.length - 2]) / 2;
+    }
+  }
+
+  // A handoff can leave towards the other lane, then arrive along the flow (or vice versa).
+  // In particular, a decision's return branch must not leave through its incoming side and
+  // retrace the path past the preceding step. Try the two single-corner routes, keeping the
+  // ranked route when a node or another label blocks them.
+  const routePoints = edges.reduce((count, edge) => count + edge.route.length / 3, 0);
+  if (m * (real.length + edges.length + routePoints) <= ROUTE_BUDGET) {
+    const amid = (i: number): number => (bandStart[RANK[i]] + bandEnd[RANK[i]]) / 2;
+    const labels = edges.map(e => [sideways ? e.labelY : e.labelX, flip(sideways ? e.labelX : e.labelY)]);
+    const overlaps = (c0: number, a0: number, c1: number, a1: number, lc: number, la: number, cw: number, ah: number): boolean =>
+      c1 > lc - cw / 2 && c0 < lc + cw / 2 && a1 > la - ah / 2 && a0 < la + ah / 2;
+    const clear = (c0: number, a0: number, c1: number, a1: number, src: number, dst: number, ei: number): boolean => {
+      for (let i = 0; i < real.length; i++) {
+        if (i !== src && i !== dst && overlaps(c0, a0, c1, a1, C[i], amid(i), SIZE[i] + 8, DEPTH[i] + 8)) return false;
+      }
+      for (let i = 0; i < edges.length; i++) {
+        const e = edges[i];
+        if (i !== ei && e.labelW > 0 && overlaps(c0, a0, c1, a1, labels[i][0], labels[i][1], sideways ? e.labelH : e.labelW, sideways ? e.labelW : e.labelH)) return false;
+      }
+      return true;
+    };
+    for (let k = 0; k < m; k++) {
+      const e = ledges[k], ei = edgeOf[k], out = edges[ei];
+      const a = e.tail, b = e.head;
+      if (LANE[a] === LANE[b] || Math.abs(C[b] - C[a]) < 1) continue;
+      const ac = C[a], bc = C[b], aa = amid(a), ba = amid(b);
+      const dc = Math.sign(bc - ac), da = Math.sign(ba - aa);
+      const candidates = [
+        [ac + dc * SIZE[a] / 2, aa, bc, aa, bc, ba - da * DEPTH[b] / 2],
+        [ac, aa + da * DEPTH[a] / 2, ac, ba, bc - dc * SIZE[b] / 2, ba],
+      ];
+      for (const pts of candidates) {
+        let valid = true;
+        for (let p = 2; p < pts.length; p += 2) {
+          if (!clear(Math.min(pts[p - 2], pts[p]) - 2, Math.min(pts[p - 1], pts[p + 1]) - 2,
+            Math.max(pts[p - 2], pts[p]) + 2, Math.max(pts[p - 1], pts[p + 1]) + 2, a, b, ei)) { valid = false; break; }
+        }
+        if (!valid) continue;
+        let lc = 0, la = 0, longest = -1;
+        if (out.labelW > 0) {
+          const cw = e.labelW, ah = e.labelH;
+          for (let p = 2; p < pts.length; p += 2) {
+            const cc = (pts[p - 2] + pts[p]) / 2, ca = (pts[p - 1] + pts[p + 1]) / 2;
+            const across = Math.abs(pts[p] - pts[p - 2]), along = Math.abs(pts[p + 1] - pts[p - 1]);
+            const run = across + along;
+            if (run <= longest || (across > 0 ? across < cw + 8 : along < ah + 8)) continue;
+            if (cc - cw / 2 < 0 || cc + cw / 2 > breadthTotal || ca - ah / 2 < 0 || ca + ah / 2 > length) continue;
+            // Include the ends here: the label must clear both shapes it connects.
+            if (!clear(cc - cw / 2, ca - ah / 2, cc + cw / 2, ca + ah / 2, -1, -1, ei)) continue;
+            const lx = px(cc, ca), ly = py(cc, ca);
+            let crossed = false;
+            // A label moved onto a handoff must not cover a return path that keeps its
+            // ranked route. A segment's whole box is kept clear, including its curve.
+            for (let i = 0; i < edges.length && !crossed; i++) {
+              if (i === ei) continue;
+              const route = edges[i].route;
+              for (let j = 3; j < route.length; j += 3) {
+                if (Math.max(route[j - 3], route[j]) > lx - out.labelW / 2 && Math.min(route[j - 3], route[j]) < lx + out.labelW / 2 &&
+                  Math.max(route[j - 2], route[j + 1]) > ly - out.labelH / 2 && Math.min(route[j - 2], route[j + 1]) < ly + out.labelH / 2) { crossed = true; break; }
+              }
+            }
+            if (crossed) continue;
+            lc = cc; la = ca; longest = run;
+          }
+          if (longest < 0) continue;
+        }
+        out.route = [];
+        for (let p = 0; p < pts.length; p += 2) {
+          const crosswise = p === 0 ? pts[0] !== pts[2] : pts[p] !== pts[p - 2];
+          out.route.push(px(pts[p], pts[p + 1]), py(pts[p], pts[p + 1]), crosswise ? 1 - axis : axis);
+        }
+        if (out.labelW > 0) {
+          out.labelX = px(lc, la); out.labelY = py(lc, la);
+          labels[ei] = [lc, la];
+        }
+        break;
+      }
     }
   }
 
