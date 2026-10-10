@@ -126,10 +126,10 @@ describe('lane layout', () => {
     expect(nodes[1].x).toBeCloseTo(nodes[2].x, 6);
   });
 
-  it('keeps random graphs well formed', () => {
+  it.each([24, 12])('keeps random graphs well formed with %i pixels of lane padding', (lanePad) => {
     for (let seed = 1; seed <= 300; seed++) {
       const { nodes, edges, lanes, leaves, laneOf, inner, innerLane, dir } = randomGraph(seed);
-      const result = laneLayout(nodes, edges, dir, OPTIONS);
+      const result = laneLayout(nodes, edges, dir, OPTIONS, lanePad);
       const where = `seed ${seed}`;
       expect(Number.isFinite(result.width) && Number.isFinite(result.height), where).toBe(true);
       for (const c of nodes) {

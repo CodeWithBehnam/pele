@@ -398,8 +398,8 @@ data ItemAdded {
 `,
   },
   swimlane: {
-    title: "Lane direction",
-    note: "Labels wrap and gaps tighten without turning the lanes.",
+    title: "Vertical lanes",
+    note: "Narrow screens turn the flow downward, keeping each step in its lane and lane headings across the top.",
     source: `swimlane-beta LR
   subgraph Customer
     Browse[Browse catalogue]

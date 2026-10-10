@@ -11,7 +11,7 @@ const SWEEPS = 8;
 const MAX_DUMMIES = 20000;
 const MAX_HOPS = 10000;
 
-export function laneLayout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: LayeredOptions): CompoundResult {
+export function laneLayout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: LayeredOptions, lanePad = LANE_PAD): CompoundResult {
   const n = nodes.length;
   if (n === 0) return { width: 0, height: 0 };
   const sideways = dir === 'LR' || dir === 'RL';
@@ -26,11 +26,11 @@ export function laneLayout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: Layere
   const hasChild = new Uint8Array(n);
   for (let i = 0; i < n; i++) if (nodes[i].parent >= 0) hasChild[nodes[i].parent] = 1;
   // Room a lane keeps around its items, so that the groups drawn around them stay inside it.
-  const pad = new Float64Array(laneCount).fill(LANE_PAD);
-  let endPad = LANE_PAD;
+  const pad = new Float64Array(laneCount).fill(lanePad);
+  let endPad = lanePad;
   const laneOf = (i: number): number => {
     let t = i;
-    let room = LANE_PAD;
+    let room = lanePad;
     for (let hops = 0; nodes[t].parent >= 0 && hops < MAX_HOPS; hops++) {
       t = nodes[t].parent;
       if (laneSlot[t] < 0) room += Math.max(nodes[t].padX, nodes[t].padTop, nodes[t].padBottom);

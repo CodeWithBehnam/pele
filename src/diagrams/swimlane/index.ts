@@ -57,7 +57,11 @@ function drawLane(c: CNode, label: Label, style: ResolvedStyle, classes: string,
   );
 }
 
-const variant: FlowVariant = { type: 'swimlane', prepare, layout: laneLayout, drawGroup: drawLane };
+const variant: FlowVariant = {
+  type: 'swimlane', prepare,
+  layout: (nodes, edges, dir, options, tight) => laneLayout(nodes, edges, dir, options, tight ? 12 : undefined),
+  drawGroup: drawLane,
+};
 
 // A swimlane diagram is a flowchart whose top-level subgraphs are lanes: same syntax, same model.
 export const swimlane: Diagram<FlowDb> = {

@@ -34,7 +34,7 @@ function numberOption(section: Config, key: string, fallback: number): number {
 export interface FlowVariant {
   type: string;
   prepare(graph: FlowGraph): void;
-  layout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: LayeredOptions): CompoundResult;
+  layout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: LayeredOptions, tight: boolean): CompoundResult;
   drawGroup?(c: CNode, label: Label, style: ResolvedStyle, classes: string, id: string, dir: Dir, icons: IconResolver | undefined): string;
 }
 
@@ -54,8 +54,7 @@ interface NodeView {
 }
 
 export function renderFlowchart(db: FlowDb, config: Config, options: RenderOptions, variant?: FlowVariant): Rendered {
-  if (variant !== undefined) return tighten(options, (tight) => draw(db, config, options, variant, false, tight));
-  const fitted = (down: boolean): Rendered => tighten(options, (tight) => draw(db, config, options, undefined, down, tight));
+  const fitted = (down: boolean): Rendered => tighten(options, (tight) => draw(db, config, options, variant, down, tight));
   return runsAcross(db.direction) ? turnToFit(options, fitted) : fitted(false);
 }
 
@@ -172,7 +171,7 @@ function draw(db: FlowDb, config: Config, options: RenderOptions, variant: FlowV
     });
   }
 
-  const layout = (variant?.layout ?? compoundLayout)(cnodes, cedges, rootDir, {
+  const layoutOptions: LayeredOptions = {
     nodeSep: numberOption(flow, 'nodeSpacing', NODE_SEP) * (tight ? 0.5 : 1),
     edgeSep: EDGE_SEP,
     rankSep: numberOption(flow, 'rankSpacing', RANK_SEP) * (tight ? 0.75 : 1),
@@ -180,7 +179,10 @@ function draw(db: FlowDb, config: Config, options: RenderOptions, variant: FlowV
     tracks: typeof flow.curve === 'string' && /^step/.test(flow.curve),
     straight: flow.curve === 'linear',
     headRoom: markerTrim('arrow_point'),
-  });
+  };
+  const layout = variant
+    ? variant.layout(cnodes, cedges, rootDir, layoutOptions, tight)
+    : compoundLayout(cnodes, cedges, rootDir, layoutOptions);
 
   const title = layoutLabel(db.title, false, measurer, size, 4000, Style.Bold);
   const titleHeight = title.height > 0 ? title.height + 12 : 0;

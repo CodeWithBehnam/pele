@@ -141,7 +141,7 @@ Layout changes depend on the diagram type:
 | Kanban | Columns fold into rows |
 | Mindmap | Switches to an indented outline. See [Direction](#direction). |
 | Quadrant chart, Wardley map | Reduces width and wraps labels |
-| Flowchart, class, state, entity relationship, requirement, use case, agentflow, timeline, git graph | Switches to a vertical layout. See [Direction](#direction). |
+| Flowchart, class, state, entity relationship, requirement, use case, agentflow, timeline, git graph, swimlane | Switches to a vertical layout. Swimlane keeps steps in their lanes, with lane headings across the top. See [Direction](#direction). |
 | Flowchart, class, C4 | Reduces spacing between nodes and around groups. C4 also reduces columns within boundaries and places relation labels beside their arrows, ignoring manual label offsets in the compact layout. |
 | Sequence | Wraps participant names, messages and notes; reduces spacing between participants |
 | Railroad | Wraps long sequences onto connected rows |
@@ -149,7 +149,7 @@ Layout changes depend on the diagram type:
 | Packet | Splits fields into shorter rows, preserving bit numbers and wrapping field labels |
 | Ishikawa | Switches to a vertical cause tree |
 | Tree view | Wraps filenames and puts descriptions beneath them |
-| Architecture, block, swimlane | Wraps labels and reduces spacing while retaining grid positions, columns and lane direction |
+| Architecture, block | Wraps labels and reduces spacing while retaining grid positions and columns |
 | Other types | Keeps the original layout |
 
 Some diagrams still exceed `maxWidth` when their participants, nested boundaries, explicit columns or link directions need more room. `maxWidth` is a layout hint; it does not clip content or guarantee a maximum output width.
@@ -158,7 +158,7 @@ Some diagrams still exceed `maxWidth` when their participants, nested boundaries
 
 When a diagram exceeds `maxWidth` and the available width is below 640 pixels, supported horizontal layouts switch to a vertical layout if that reduces their width. For example, `flowchart LR` renders as `flowchart TB`.
 
-Set `autoDirection: false` to preserve the source direction. Use `directionBreakpoint` to change the width threshold. Subgraph directions, vertical diagrams, and swimlanes retain their direction. Journey, event modeling, packet and Ishikawa use the same breakpoint and `autoDirection` setting for their alternate layouts.
+Set `autoDirection: false` to preserve the source direction. Use `directionBreakpoint` to change the width threshold. Subgraph directions and vertical diagrams retain their direction. Journey, event modeling, packet and Ishikawa use the same breakpoint and `autoDirection` setting for their alternate layouts.
 
 [`mount()`](#mount) measures the container and re-renders when its width changes. With `render()`, handle width changes yourself.
 

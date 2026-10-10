@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PeleError, detectType, parse, render, supports } from '../../src/index.js';
 import type { FlowchartModel } from '../../src/index.js';
@@ -18,6 +19,8 @@ const ORDER = `swimlane-beta LR
     pick[Pick] --> ship[Ship]
   end
   pay -- paid --> pick`;
+
+const examples: string[] = JSON.parse(readFileSync('tests/corpus/swimlane-docs.json', 'utf8'));
 
 interface Box {
   x: number;
@@ -96,6 +99,68 @@ describe('swimlane rendering', () => {
     expect(at.get('a1')![1]).toBe(at.get('b1')![1]);
     expect(at.get('a2')![1]).toBe(at.get('b2')![1]);
     expect(at.get('a1')![0]).toBe(at.get('a2')![0]);
+  });
+
+  it('turns long horizontal flows downward while retaining every lane, step and relation', () => {
+    for (const source of [examples[2], examples[9]]) {
+      const model = parse(source) as FlowchartModel;
+      const before = JSON.stringify(model);
+      const wide = render(model, options);
+      const narrow = render(model, { ...options, maxWidth: 480 });
+      expect(narrow.width).toBeLessThanOrEqual(480);
+      expect(narrow.height).toBeGreaterThan(wide.height);
+      expect(narrow.svg).not.toContain('rotate(');
+      expect(narrow.svg).toContain('font:16px');
+      const boxes = lanes(narrow.svg), at = centers(narrow.svg);
+      expect([...boxes.keys()]).toEqual([...lanes(wide.svg).keys()]);
+      expect([...at.keys()]).toEqual([...centers(wide.svg).keys()]);
+      for (const lane of model.subgraphs) {
+        for (const id of lane.nodes) expect(inside(at.get(id)!, boxes.get(lane.id)!)).toBe(true);
+      }
+      expect(count(narrow.svg, 'class="pele-edge"')).toBe(count(wide.svg, 'class="pele-edge"'));
+      expect(count(narrow.svg, 'class="pele-marker"')).toBe(count(wide.svg, 'class="pele-marker"'));
+      const labels = (svg: string) => [...svg.matchAll(/<text\b[^>]*>(.*?)<\/text>/g)]
+        .map(match => match[1].replace(/<[^>]+>|\s/g, ''));
+      expect(labels(narrow.svg)).toEqual(labels(wide.svg));
+      expect(JSON.stringify(model)).toBe(before);
+      expect(render(model, { ...options, maxWidth: wide.width }).svg).toBe(wide.svg);
+      assertInert(narrow.svg);
+    }
+  });
+
+  it('honors autoDirection, the breakpoint and an already vertical direction', () => {
+    const source = examples[2];
+    const horizontal = svgOf(source, { maxWidth: 480, autoDirection: false });
+    expect(horizontal).toContain('rotate(-90 ');
+    expect(svgOf(source, { maxWidth: 480, directionBreakpoint: 480 })).toBe(horizontal);
+    expect(svgOf(source, { maxWidth: 700 })).toContain('rotate(-90 ');
+    expect(svgOf(source, { maxWidth: 700, directionBreakpoint: 800 })).not.toContain('rotate(');
+    expect(svgOf(source, { maxWidth: 480 })).toBe(svgOf(source.replace('LR', 'TB'), { maxWidth: 480 }));
+    expect(svgOf(source.replace('LR', 'RL'), { maxWidth: 480 })).toBe(svgOf(source, { maxWidth: 480 }));
+    const up = centers(svgOf(ORDER.replace('LR', 'BT'), { maxWidth: 160 }));
+    expect(up.get('browse')![1]).toBeGreaterThan(up.get('pay')![1]);
+  });
+
+  it('keeps a horizontal layout when turning would make it wider', () => {
+    const source = 'swimlane-beta LR\n' + Array.from({ length: 5 }, (_, i) =>
+      `subgraph L${i}\n a${i} --> b${i}\nend`).join('\n');
+    expect(svgOf(source, { maxWidth: 160 })).toBe(svgOf(source, { maxWidth: 160, autoDirection: false }));
+    expect(svgOf(source, { maxWidth: 160 })).toContain('rotate(-90 ');
+  });
+
+  it('retains nested groups, unnamed and empty lanes, styled nodes, links and self-loops after turning', () => {
+    const source = '---\ntitle: Delivery\n---\nswimlane-beta LR\naccTitle: Accessible delivery\naccDescr: Delivery process\nstart --> a\nsubgraph Team\n subgraph Inner\n a{Ready?} --> b[(Store)]\n b --> b\n end\n c --> d --> e\nend\nsubgraph Empty\nend\nb --> c\nclick a "https://example.com"\nstyle a fill:#f00\nclassDef hot stroke:#0f0\nclass b hot';
+    const wide = render(source, options), narrow = render(source, { ...options, maxWidth: 320 });
+    expect(narrow.svg).not.toContain('rotate(');
+    expect(lanes(narrow.svg).size).toBe(3);
+    const inner = narrow.svg.match(/class="pele-cluster" data-id="Inner"><rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"/)!;
+    const b = { x: Number(inner[1]), y: Number(inner[2]), w: Number(inner[3]), h: Number(inner[4]) };
+    const at = centers(narrow.svg);
+    expect(inside(at.get('a')!, b)).toBe(true);
+    expect(inside(at.get('b')!, b)).toBe(true);
+    expect(narrow.links).toEqual(wide.links);
+    for (const value of ['>Delivery<', '<title id="pele-title">Accessible delivery</title>', 'Delivery process', 'fill:#f00', 'stroke:#0f0', 'pele-shape-diam', 'pele-shape-cyl']) expect(narrow.svg).toContain(value);
+    expect(count(narrow.svg, 'class="pele-edge"')).toBe(count(wide.svg, 'class="pele-edge"'));
   });
 
   it('follows every direction', () => {

@@ -152,9 +152,9 @@ describe('the maxWidth option', () => {
     }
     const small = 'flowchart LR\n  A --> B';
     expect(render(small, { ...options, maxWidth: PHONE }).svg).toBe(render(small, options).svg);
-    // Lanes are not turned: across and down are different diagrams there.
+    // Swimlanes also keep their source direction when automatic turning is disabled.
     const lanes = 'swimlane-beta LR\n  subgraph One\n    A[First step] --> B[Second step]\n  end\n  subgraph Two\n    C[Third step] --> D[Fourth step]\n  end\n  B --> C';
-    const compact = render(lanes, { ...options, maxWidth: 100 });
+    const compact = render(lanes, { ...options, maxWidth: 100, autoDirection: false });
     expect(compact.width).toBeLessThan(render(lanes, options).width);
     const laneTops = [...compact.svg.matchAll(/data-id="(?:One|Two)"><rect x="[^"]+" y="([^"]+)"/g)].map(match => Number(match[1]));
     expect(new Set(laneTops).size).toBe(2);
