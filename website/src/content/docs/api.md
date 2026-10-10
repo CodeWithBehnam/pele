@@ -142,7 +142,7 @@ Layout changes depend on the diagram type:
 | Mindmap | Switches to an indented outline. See [Direction](#direction). |
 | Quadrant chart, Wardley map | Reduces width and wraps labels |
 | Flowchart, class, state, entity relationship, requirement, use case, agentflow, timeline, git graph | Switches to a vertical layout. See [Direction](#direction). |
-| Flowchart, class, C4 | Reduces spacing between nodes and around groups. C4 also reduces columns within boundaries. |
+| Flowchart, class, C4 | Reduces spacing between nodes and around groups. C4 also reduces columns within boundaries and places relation labels beside their arrows, ignoring manual label offsets in the compact layout. |
 | Sequence | Wraps participant names, messages and notes; reduces spacing between participants |
 | Railroad | Wraps long sequences onto connected rows |
 | Journey, event modeling | Switches to vertical steps, retaining actors, scores, lanes and frame references |

@@ -169,8 +169,10 @@ function draw(db: C4Db, _config: Config, options: RenderOptions, tight: boolean)
     // The label sits on the line, or just beside it when another relation runs the opposite way.
     const beside = Math.abs(r.nx) * (lw / 2) + Math.abs(r.ny) * (lh / 2) + 2;
     const aside = r.lean ? Math.max(0, Math.min(r.lean, beside - 14)) : beside;
-    let dx = r.nx * aside + offset(rel.offsetX);
-    let dy = r.ny * aside + offset(rel.offsetY);
+    // Manual offsets are tuned to the original spacing. Reposition compact labels beside
+    // their routed arrows so an offset cannot leave them floating outside a boundary.
+    let dx = r.nx * aside + (tight ? 0 : offset(rel.offsetX));
+    let dy = r.ny * aside + (tight ? 0 : offset(rel.offsetY));
     let at = 0.5;
     if (careful) {
       // Slide along the line to the spot that covers least. Offsets from the diagram are kept unless a spot

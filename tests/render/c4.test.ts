@@ -347,6 +347,32 @@ UpdateElementStyle(nobody, "red")`);
     expect(draw(base + 'UpdateRelStyle(a, b, $offsetX="abc", $offsetY="x1")').svg).toBe(plain);
   });
 
+  it('reattaches manually offset labels to their arrows when the component layout compacts', () => {
+    const source = (JSON.parse(readFileSync('tests/corpus/c4-docs.json', 'utf8')) as string[])
+      .find(source => source.includes('Accounts Summary Controller'))!;
+    const withoutOffsets = source.replace(/^\s*UpdateRelStyle\([^\n]+\)\s*$/gm, '');
+    const parsed = model(source);
+    const before = JSON.stringify(parsed);
+    for (const maxWidth of [320, 480, 568]) {
+      const compact = render(parsed, { ...options, maxWidth });
+      expect(compact.svg).toBe(render(withoutOffsets, { ...options, maxWidth }).svg);
+    }
+    expect(JSON.stringify(parsed)).toBe(before);
+    const { svg } = render(parsed, { ...options, maxWidth: 568 });
+    for (const [from, to] of [['sign', 'security'], ['accounts', 'mbsfacade']]) {
+      const a = box(svg, from), b = box(svg, to);
+      const x = labelX(svg, `${from}-${to}`), y = labelY(svg, `${from}-${to}`);
+      expect(x).toBeGreaterThan(a.x);
+      expect(x).toBeLessThan(a.x + a.w);
+      expect(y).toBeGreaterThan(a.y + a.h);
+      expect(y + 20).toBeLessThan(b.y);
+    }
+    // A container that fits the natural drawing still preserves the author's offsets.
+    const wide = draw(source);
+    expect(render(parsed, { ...options, maxWidth: wide.width }).svg).toBe(wide.svg);
+    expect(wide.svg).not.toBe(draw(withoutOffsets).svg);
+  });
+
   it('moves a boundary heading out of the way of a line', () => {
     const { svg } = draw(`C4Context
 System(top, "Top")
