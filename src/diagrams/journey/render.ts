@@ -1,10 +1,13 @@
 import type { Config } from '../../preprocess.js';
 import { escText, labelSvg, num } from '../../svg/builder.js';
 import { svgDocument } from '../../svg/root.js';
+import { literalLabel } from '../common/literal-label.js';
+import { layoutLabel } from '../../text/label.js';
 import { RADIUS, seriesColor } from '../../svg/theme.js';
 import type { Label } from '../../text/label.js';
 import { Style, defaultMeasurer } from '../../text/measurer.js';
 import type { RenderOptions, Rendered } from '../../types.js';
+import { turnToFit } from '../common/fit-width.js';
 import { fitLabel, plainLabel } from '../common/fit.js';
 import { journeyActors, type JourneyModel } from './db.js';
 
@@ -35,11 +38,16 @@ function face(x: number, y: number, mood: keyof typeof MOUTHS): string {
 }
 
 export function renderJourney(model: JourneyModel, _config: Config, options: RenderOptions): Rendered {
+  return turnToFit(options, (down) => draw(model, _config, options, down));
+}
+
+function draw(model: JourneyModel, _config: Config, options: RenderOptions, down: boolean): Rendered {
   const size = options.fontSize ?? 16;
   const small = Math.round(size * 0.875);
   const tiny = Math.round(size * 0.75);
   const measurer = options.measurer ?? defaultMeasurer(options.fontFamily);
   const pad = options.padding ?? 8;
+  if (down) return verticalJourney(model, options);
   const tasks = model.tasks;
   const n = tasks.length;
 
@@ -208,4 +216,57 @@ export function renderJourney(model: JourneyModel, _config: Config, options: Ren
     height: totalHeight,
     links: [],
   };
+}
+
+function verticalJourney(model: JourneyModel, options: RenderOptions): Rendered {
+  const size = options.fontSize ?? 16;
+  const small = Math.round(size * 0.875);
+  const measurer = options.measurer ?? defaultMeasurer(options.fontFamily);
+  const pad = options.padding ?? 8;
+  const room = Math.max(140, (options.maxWidth ?? 320) - 2 * pad);
+  const title = layoutLabel(model.title, false, measurer, size, room, Style.Bold);
+  const names = journeyActors(model.tasks).filter(name => name !== '');
+  const actors = new Map(names.map((name, i) => [name, i]));
+  let y = pad + (title.height ? title.height + 16 : 0);
+  let section: string | undefined;
+  let body = '';
+  let width = title.width;
+  model.tasks.forEach((task, index) => {
+    if (task.section !== section) {
+      section = task.section;
+      const head = layoutLabel(section, false, measurer, size, room - 16, Style.Bold);
+      if (head.height) {
+        body += labelSvg(head, pad + 8 + head.width / 2, y + head.height / 2, ' class="pele-cluster-label" font-weight="var(--_hw)"');
+        width = Math.max(width, head.width + 16);
+        y += head.height + 8;
+      }
+    }
+    const label = layoutLabel(task.task, false, measurer, small, room - 72);
+    const people = task.people.filter(name => name !== '').map(name => ({ name, label: literalLabel(name, measurer, small, room - 44) }));
+    const textH = Math.max(label.height, 42);
+    let h = 2 * PAD_Y + textH;
+    for (const person of people) h += Math.max(16, person.label.height) + 4;
+    const w = Math.max(room, label.width + 72);
+    body += `<g class="pele-node pele-journey-step" data-id="${index}"><rect x="${num(pad)}" y="${num(y)}" width="${num(w)}" height="${num(h)}" rx="${RADIUS}" fill="var(--_s)" stroke="var(--_b)"/>`;
+    body += labelSvg(label, pad + PAD_X + label.width / 2, y + PAD_Y + label.height / 2, ' class="pele-label"');
+    const cx = pad + w - 28;
+    body += face(cx, y + PAD_Y + FACE, task.score > 3 ? 'happy' : task.score < 3 ? 'sad' : 'neutral');
+    body += `<text class="pele-journey-score" x="${num(cx)}" y="${num(y + PAD_Y + 2 * FACE + small)}" font-size="${small}" text-anchor="middle">${task.score}</text>`;
+    let py = y + PAD_Y + textH + 4;
+    for (const person of people) {
+      const ph = Math.max(16, person.label.height);
+      body += `<circle class="pele-actor" cx="${num(pad + 16)}" cy="${num(py + ph / 2)}" r="${DOT}" fill="${seriesColor(actors.get(person.name)!)}"/>` +
+        labelSvg(person.label, pad + 28 + person.label.width / 2, py + ph / 2, ` class="pele-journey-actor" font-size="${small}"`);
+      py += ph + 4;
+    }
+    body += '</g>';
+    y += h;
+    if (index + 1 < model.tasks.length) body += `<path class="pele-edge" d="M${num(pad + w / 2)},${num(y)}v16" fill="none" stroke="var(--_l)"/>`;
+    y += 16;
+    width = Math.max(width, w);
+  });
+  const totalWidth = Math.ceil(width + 2 * pad);
+  const height = Math.ceil(Math.max(pad + title.height, y - (model.tasks.length ? 16 : 0)) + pad);
+  const content = labelSvg(title, totalWidth / 2, pad + title.height / 2, ' class="pele-title" font-weight="var(--_tw)"') + body;
+  return { svg: svgDocument('journey', totalWidth, height, size, options, model, content), width: totalWidth, height, links: [] };
 }

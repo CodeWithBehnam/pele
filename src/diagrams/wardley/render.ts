@@ -63,10 +63,10 @@ function dimension(config: Config, given: number | undefined, key: string, fallb
 
 export function renderWardley(model: WardleyModel, config: Config, options: RenderOptions): Rendered {
   const natural = dimension(config, model.size?.width, 'width', 900);
-  return fitWidth(options, natural, 360, (plotW) => draw(model, config, options, plotW, natural));
+  return fitWidth(options, natural, 160, (plotW, tight) => draw(model, config, options, plotW, natural, tight));
 }
 
-function draw(model: WardleyModel, config: Config, options: RenderOptions, plotW: number, naturalW: number): Rendered {
+function draw(model: WardleyModel, config: Config, options: RenderOptions, plotW: number, naturalW: number, tight: boolean): Rendered {
   const size = options.fontSize ?? 16;
   const small = Math.round(size * 0.8125);
   const tiny = Math.round(size * 0.6875);
@@ -95,7 +95,7 @@ function draw(model: WardleyModel, config: Config, options: RenderOptions, plotW
     grow(x, y - label.size, x + label.width, y - label.size + label.height + 4);
     return startLabel(label, x, y, attrs);
   };
-  const text = (raw: string, fontSize: number, maxWidth = 4000, style = 0): Label => layoutLabel(raw, false, measurer, fontSize, maxWidth, style);
+  const text = (raw: string, fontSize: number, maxWidth = tight ? Math.max(64, Math.min(120, plotW / 2)) : 4000, style = 0): Label => layoutLabel(raw, false, measurer, fontSize, maxWidth, style);
   const projectX = (value: number): number => (value / 100) * plotW;
   const projectY = (value: number): number => plotH - (value / 100) * plotH;
 
@@ -173,7 +173,7 @@ function draw(model: WardleyModel, config: Config, options: RenderOptions, plotW
     const node = at.node;
     if (node.className === 'anchor') {
       let label = anchorLabels.get(node);
-      if (!label) anchorLabels.set(node, (label = text(node.label, small, 4000, Style.Bold)));
+      if (!label) anchorLabels.set(node, (label = text(node.label, small, tight ? Math.max(64, plotW / 2) : 4000, Style.Bold)));
       return 1 / Math.hypot(ux / (label.width / 2 + 5), uy / (small * 0.8));
     }
     if (node.isPipelineParent) return SQUARE / Math.SQRT2;
@@ -299,7 +299,7 @@ function draw(model: WardleyModel, config: Config, options: RenderOptions, plotW
     const oy = node.labelOffsetY === undefined ? undefined : clamp(node.labelOffsetY, -5000, 5000);
     let caption: string;
     if (anchor) {
-      const label = anchorLabels.get(node) ?? text(node.label, small, 4000, Style.Bold);
+      const label = anchorLabels.get(node) ?? text(node.label, small, tight ? Math.max(64, plotW / 2) : 4000, Style.Bold);
       caption = centered(label, x + (ox ?? 0), y + (oy ?? -3), ` class="pele-label" font-size="${small}" font-weight="var(--_hw)"`);
     } else {
       const label = text(node.label, small);
@@ -339,7 +339,7 @@ function draw(model: WardleyModel, config: Config, options: RenderOptions, plotW
   }
   const listed = model.annotations.filter((a) => a.text).sort((a, b) => a.number - b.number);
   if (listed.length > 0) {
-    const lines = listed.map((a) => text(`${a.number}. ${a.text!}`, small, 320));
+    const lines = listed.map((a) => text(`${a.number}. ${a.text!}`, small, tight ? Math.max(80, plotW - 20) : 320));
     let width = 0;
     let height = 0;
     for (const line of lines) {
@@ -367,7 +367,7 @@ function draw(model: WardleyModel, config: Config, options: RenderOptions, plotW
 
   let notes = '';
   for (const note of model.notes) {
-    notes += starting(text(note.text, small, Math.min(360, plotW * 0.6)), projectX(note.x), projectY(note.y), ` class="pele-wardley-note" font-size="${small}" font-weight="var(--_hw)"`);
+    notes += starting(text(note.text, small, Math.min(360, plotW * 0.6), tight ? Style.Bold : 0), projectX(note.x), projectY(note.y), ` class="pele-wardley-note" font-size="${small}" font-weight="var(--_hw)"`);
   }
 
   // Accelerators point right, deaccelerators left.
@@ -391,7 +391,7 @@ function draw(model: WardleyModel, config: Config, options: RenderOptions, plotW
   for (const a of model.accelerators) force(a.name, a.x, a.y, true);
   for (const d of model.deaccelerators) force(d.name, d.x, d.y, false);
 
-  const title = layoutLabel(model.title, false, measurer, size, 4000, Style.Bold);
+  const title = layoutLabel(model.title, false, measurer, size, tight ? Math.max(80, plotW) : 4000, Style.Bold);
   const titleHeight = title.height > 0 ? title.height + 12 : 0;
   const left = Math.min(minX, plotW / 2 - title.width / 2);
   const right = Math.max(maxX, plotW / 2 + title.width / 2);

@@ -208,3 +208,316 @@ export const layoutCases: Record<string, LayoutGroup[]> = {
     { title: 'Relations both ways', source: 'requirementDiagram\n  requirement fast {\n    id: 1\n    text: Renders quickly\n  }\n  requirement small {\n    id: 2\n    text: Ships little code\n  }\n  element layout {\n    type: module\n  }\n  layout - satisfies -> fast\n  layout - satisfies -> small\n  fast - derives -> small\n  small - refines -> fast\n' },
   ]),
 };
+
+const mobileCases: Record<string, LayoutCase> = {
+  sequence: {
+    title: "Four participants",
+    note: "Participant names, messages and notes wrap while the lifelines stay in columns.",
+    source: `sequenceDiagram
+  autonumber
+  actor Customer
+  participant Web as Web app
+  participant API as API gateway
+  participant Bank
+  Customer->>Web: Place order
+  Web->>API: POST /orders
+  activate API
+  API->>Bank: Authorise payment
+  Bank-->>API: Approved
+  API-->>Web: 201 Created
+  deactivate API
+  Web-->>Customer: Order confirmed
+  Note over Customer,Bank: One order, one transaction
+`,
+  },
+  railroad: {
+    title: "Nested grammar",
+    note: "Long sequences wrap onto connected rows; alternatives and repetitions keep their tracks.",
+    source: `railroad-ebnf-beta
+title "JSON Grammar"
+
+json = element ;
+element = object | array | string | number | "true" | "false" | "null" ;
+object = "{" [ member ( "," member )* ] "}" ;
+array = "[" [ element ( "," element )* ] "]" ;
+member = string ":" element ;
+`,
+  },
+  journey: {
+    title: "Journey steps",
+    note: "On a narrow screen, each step keeps its score, mood and actors in a vertical sequence.",
+    source: `journey
+    title My working day
+    section Go to work
+      Make tea: 5: Me
+      Go upstairs: 3: Me
+      Do work: 1: Me, Cat
+    section Go home
+      Go downstairs: 5: Me
+      Sit down: 5: Me
+`,
+  },
+  packet: {
+    title: "Protocol fields",
+    note: "Shorter rows preserve bit numbers. A row grows taller when a field label needs to wrap.",
+    source: `---
+title: "TCP Packet"
+---
+packet
+0-15: "Source Port"
+16-31: "Destination Port"
+32-63: "Sequence Number"
+64-95: "Acknowledgment Number"
+96-99: "Data Offset"
+100-105: "Reserved"
+106: "URG"
+107: "ACK"
+108: "PSH"
+109: "RST"
+110: "SYN"
+111: "FIN"
+112-127: "Window"
+128-143: "Checksum"
+144-159: "Urgent Pointer"
+160-191: "(Options and Padding)"
+192-255: "Data (variable length)"
+`,
+  },
+  c4: {
+    title: "Nested boundaries",
+    note: "Columns fold within their boundaries. Deep nesting and explicit relation offsets can still need more width.",
+    source: `    C4Context
+      title System Context diagram for Internet Banking System
+      Enterprise_Boundary(b0, "BankBoundary0") {
+        Person(customerA, "Banking Customer A", "A customer of the bank, with personal bank accounts.")
+        Person(customerB, "Banking Customer B")
+        Person_Ext(customerC, "Banking Customer C", "desc")
+
+        Person(customerD, "Banking Customer D", "A customer of the bank, <br/> with personal bank accounts.")
+
+        System(SystemAA, "Internet Banking System", "Allows customers to view information about their bank accounts, and make payments.")
+
+        Enterprise_Boundary(b1, "BankBoundary") {
+
+          SystemDb_Ext(SystemE, "Mainframe Banking System", "Stores all of the core banking information about customers, accounts, transactions, etc.")
+
+          System_Boundary(b2, "BankBoundary2") {
+            System(SystemA, "Banking System A")
+            System(SystemB, "Banking System B", "A system of the bank, with personal bank accounts. next line.")
+          }
+
+          System_Ext(SystemC, "E-mail system", "The internal Microsoft Exchange e-mail system.")
+          SystemDb(SystemD, "Banking System D Database", "A system of the bank, with personal bank accounts.")
+
+          Boundary(b3, "BankBoundary3", "boundary") {
+            SystemQueue(SystemF, "Banking System F Queue", "A system of the bank.")
+            SystemQueue_Ext(SystemG, "Banking System G Queue", "A system of the bank, with personal bank accounts.")
+          }
+        }
+      }
+
+      BiRel(customerA, SystemAA, "Uses")
+      BiRel(SystemAA, SystemE, "Uses")
+      Rel(SystemAA, SystemC, "Sends e-mails", "SMTP")
+      Rel(SystemC, customerA, "Sends e-mails to")
+
+      UpdateElementStyle(customerA, $fontColor="red", $bgColor="grey", $borderColor="red")
+      UpdateRelStyle(customerA, SystemAA, $textColor="blue", $lineColor="blue", $offsetX="5")
+      UpdateRelStyle(SystemAA, SystemE, $textColor="blue", $lineColor="blue", $offsetY="-10")
+      UpdateRelStyle(SystemAA, SystemC, $textColor="blue", $lineColor="blue", $offsetY="-40", $offsetX="-50")
+      UpdateRelStyle(SystemC, customerA, $textColor="red", $lineColor="red", $offsetX="-50", $offsetY="20")
+
+      UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+
+
+`,
+  },
+  architecture: {
+    title: "Fixed link sides",
+    note: "Labels and spacing tighten; the specified link sides and grid alignments stay in place.",
+    source: `architecture-beta
+    group sources(cloud)[Sources]
+        service src_a(server)[Source A] in sources
+        service src_b(server)[Source B] in sources
+        service src_c(server)[Source C] in sources
+
+    group storage(database)[Storage]
+        service db_one(database)[DB One] in storage
+        service db_two(database)[DB Two] in storage
+        service db_three(database)[DB Three] in storage
+
+    group output(disk)[Output]
+        service brief(disk)[Brief] in output
+        service analyst(server)[Analyst] in output
+        service delivery(cloud)[Delivery] in output
+
+    src_a:B --> T:db_one
+    src_b:B --> T:db_two
+    src_c:B --> T:db_three
+    db_two:B --> T:brief
+    brief:R --> L:analyst
+    analyst:R --> L:delivery
+
+    align row src_a src_b src_c
+    align row db_one db_two db_three
+    align row brief analyst delivery
+
+    align column src_a db_one
+    align column src_b db_two brief
+    align column src_c db_three
+`,
+  },
+  eventmodeling: {
+    title: "Chronological frames",
+    note: "Frames run down the page, with their lane labels, data and references.",
+    source: `eventmodeling
+
+tf 01 ui CartUI
+tf 02 cmd AddItem [[AddItem01]]
+tf 03 evt ItemAdded [[ItemAdded]]
+tf 04 cmd AddItem [[AddItem02]]
+tf 05 evt ItemAdded [[ItemAdded]]
+
+data AddItem01 {
+  description: 'john'
+  image: 'avatar_john'
+  price: 20.4
+}
+
+data AddItem02 {
+  description: 'jack'
+  image: 'avatar_jack'
+  price: 12.5
+}
+
+data ItemAdded {
+  description: string
+  image: string
+  price: number
+}
+`,
+  },
+  swimlane: {
+    title: "Lane direction",
+    note: "Labels wrap and gaps tighten without turning the lanes.",
+    source: `swimlane-beta LR
+  subgraph Customer
+    Browse[Browse catalogue]
+    Pay[Pay]
+  end
+  subgraph Warehouse
+    Pick[Pick items]
+    Ship[Ship order]
+  end
+  subgraph Finance
+    Invoice[Raise invoice]
+  end
+  Browse --> Pay
+  Pay --> Pick
+  Pick --> Ship
+  Pay --> Invoice
+`,
+  },
+  block: {
+    title: "Explicit columns",
+    note: "Labels and spacing tighten while columns and spans keep their positions.",
+    source: `block
+columns 1
+  db(("DB"))
+  blockArrowId6<["&nbsp;&nbsp;&nbsp;"]>(down)
+  block:ID
+    A
+    B["A wide one in the middle"]
+    C
+  end
+  space
+  D
+  ID --> D
+  C --> D
+  style B fill:#969,stroke:#333,stroke-width:4px
+`,
+  },
+  ishikawa: {
+    title: "Categories and causes",
+    note: "The narrow view is a cause tree that preserves the categories and nested causes.",
+    source: `ishikawa-beta
+    Blurry Photo
+    Process
+        Out of focus
+        Shutter speed too slow
+        Protective film not removed
+        Beautification filter applied
+    User
+        Shaky hands
+    Equipment
+        LENS
+            Inappropriate lens
+            Damaged lens
+            Dirty lens
+        SENSOR
+            Damaged sensor
+            Dirty sensor
+    Environment
+        Subject moved too quickly
+        Too dark
+`,
+  },
+  quadrant: {
+    title: "Quadrant labels",
+    note: "The chart fits a phone width and wraps its labels.",
+    source: `quadrantChart
+    title Reach and engagement of campaigns
+    x-axis Low Reach --> High Reach
+    y-axis Low Engagement --> High Engagement
+    quadrant-1 We should expand
+    quadrant-2 Need to promote
+    quadrant-3 Re-evaluate
+    quadrant-4 May be improved
+    Campaign A: [0.3, 0.6]
+    Campaign B: [0.45, 0.23]
+    Campaign C: [0.57, 0.69]
+    Campaign D: [0.78, 0.34]
+    Campaign E: [0.40, 0.34]
+    Campaign F: [0.35, 0.78]
+`,
+  },
+  wardley: {
+    title: "Map labels",
+    note: "The plot narrows while labels retain their font size.",
+    source: `wardley-beta
+title Tea Shop Value Chain
+
+anchor Business [0.95, 0.63]
+component Cup of Tea [0.79, 0.61]
+component Tea [0.63, 0.81]
+component Hot Water [0.52, 0.80]
+component Kettle [0.43, 0.35]
+component Power [0.10, 0.70]
+
+Business -> Cup of Tea
+Cup of Tea -> Tea
+Cup of Tea -> Hot Water
+Hot Water -> Kettle
+Kettle -> Power
+
+evolve Kettle 0.62
+evolve Power 0.89
+
+note "Standardising power allows Kettles to evolve faster" [0.30, 0.49]
+`,
+  },
+  treeview: {
+    title: "Names and descriptions",
+    note: "Long filenames wrap. Descriptions move beneath their entries and the hierarchy remains visible.",
+    source: `treeView-beta
+  project/
+    this_is_a_long_filename_that_needs_to_wrap_on_a_phone.ts :::highlight ## A description that stays with the file when the layout narrows
+    source/
+      app.ts
+`,
+  },
+};
+
+for (const [type, example] of Object.entries(mobileCases)) {
+  (layoutCases[type] ??= []).push({ title: 'Narrow screens', slug: 'narrow-screens', cases: [example] });
+}

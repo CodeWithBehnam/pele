@@ -6,6 +6,8 @@ import { RADIUS, classNames, resolveStyle } from '../../svg/theme.js';
 import { layoutLabel, type Label } from '../../text/label.js';
 import { Style, defaultMeasurer } from '../../text/measurer.js';
 import type { RenderOptions, Rendered } from '../../types.js';
+import { breakLabel } from '../common/literal-label.js';
+import { tighten, titleRoom } from '../common/fit-width.js';
 import { actorKind, actorSize, drawActor, isFigure, type ActorSize } from './actors.js';
 import type { SeqDb } from './db.js';
 import { LINETYPE, PLACEMENT, type SeqActor, type SeqBox, type SeqMessage, type SeqNumbering } from './types.js';
@@ -207,6 +209,10 @@ function trim(type: Head): number {
 }
 
 export function renderSequence(db: SeqDb, config: Config, options: RenderOptions): Rendered {
+  return tighten(options, (tight) => draw(db, config, options, tight));
+}
+
+function draw(db: SeqDb, config: Config, options: RenderOptions, tight: boolean): Rendered {
   const conf = (config.sequence ?? {}) as Config;
   const size = options.fontSize ?? 16;
   const small = Math.round(size * 0.875);
@@ -216,21 +222,27 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
   const pad = options.padding ?? 8;
   const mirror = conf.mirrorActors !== false;
   const rightAngles = conf.rightAngles === true;
-  const actorMargin = option(conf, 'actorMargin', 40);
-  const minW = option(conf, 'width', 64);
+  const actorMargin = Math.min(option(conf, 'actorMargin', 40), tight ? 8 : Infinity);
+  const minW = Math.min(option(conf, 'width', 64), tight ? 48 : Infinity);
   const minH = option(conf, 'height', Math.round(size * 1.5) + 20);
-  const wrapW = option(conf, 'width', 160);
+  const wrapW = Math.min(option(conf, 'width', 160), tight ? Math.max(32, ((options.maxWidth ?? 320) - 2 * pad) / Math.max(1, db.actors.size) - actorMargin - 24) : Infinity);
   // Mermaid's default of 35 corresponds to Pele's default gap. Other values move it by the difference.
   const msgGap = Math.max(4, 14 + option(conf, 'messageMargin', 35) - 35);
-  const notePad = option(conf, 'noteMargin', 10);
-  const boxPad = option(conf, 'boxMargin', 10);
+  const notePad = Math.min(option(conf, 'noteMargin', 10), tight ? 6 : Infinity);
+  const boxPad = Math.min(option(conf, 'boxMargin', 10), tight ? 6 : Infinity);
   const align = conf.messageAlign === 'left' ? -1 : conf.messageAlign === 'right' ? 1 : 0;
 
+  const msgPad = tight ? 6 : MSG_PAD;
+  const noteOver = tight ? 8 : NOTE_OVER;
+  const framePad = tight ? 12 : FRAME_PAD;
+  const frameNest = tight ? 6 : FRAME_NEST;
   const messages = db.messages;
   const count = messages.length;
   const numbering = numberMessages(messages, conf.showSequenceNumbers === true);
-  const text = (raw: string | undefined, fontSize: number, wrap: boolean, width = wrapW, base = 0): Label =>
-    layoutLabel(raw, false, measurer, fontSize, wrap ? width : Infinity, base);
+  const text = (raw: string | undefined, fontSize: number, wrap: boolean, width = wrapW, base = 0): Label => {
+    const label = layoutLabel(raw, false, measurer, fontSize, tight || wrap ? width : Infinity, base);
+    return tight ? breakLabel(label, measurer, Math.max(120, width)) : label;
+  };
 
   let used: Set<string | undefined> | undefined;
   if (conf.hideUnusedParticipants === true) {
@@ -260,7 +272,7 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
       actor,
       kind,
       label,
-      size: actorSize(kind, label, minW, minH),
+      size: actorSize(kind, label, minW, minH, tight ? 8 : undefined),
       x: 0,
       createAt,
       destroyAt,
@@ -296,7 +308,7 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
       else if (a === b) {
         need(a - 1, a, w / 2 + NOTE_GAP);
         need(a, a + 1, w / 2 + NOTE_GAP);
-      } else need(Math.min(a, b), Math.max(a, b), w - 2 * NOTE_OVER);
+      } else need(Math.min(a, b), Math.max(a, b), w - 2 * noteOver);
       views[i] = { kind: V.Note, a, b, label, x: 0, w };
     } else if (isLineMessage(m.type)) {
       const label = text(m.message, small, m.wrap);
@@ -307,7 +319,7 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
       } else {
         const created = cols[b].createAt === i ? cols[b].size.w / 2 : 0;
         const central = m.centralConnection ? 4 * CENTRAL_R : 0;
-        need(Math.min(a, b), Math.max(a, b), label.width + 2 * MSG_PAD + ACT_W + badge + created + central);
+        need(Math.min(a, b), Math.max(a, b), (tight ? Math.min(label.width, Math.max(16, wrapW - 16)) : label.width) + 2 * msgPad + ACT_W + badge + created + central);
         views[i] = { kind: V.Line, a, b, label, x: 0, w: 0 };
       }
     }
@@ -370,7 +382,7 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
   // Horizontal extents of every block, from what it holds.
   const frames = new Array<Frame | undefined>(count);
   const open: Frame[] = [];
-  const spanAll = (): [number, number] => (last < 0 ? [0, 120] : [cols[0].x - FRAME_PAD, cols[last].x + FRAME_PAD]);
+  const spanAll = (): [number, number] => (last < 0 ? [0, 120] : [cols[0].x - framePad, cols[last].x + framePad]);
   for (let i = 0; i < count; i++) {
     const m = messages[i];
     const type = m.type;
@@ -413,7 +425,7 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
           const raw = messages[frame.dividers[k]].message;
           const tab = k === 0 ? frame.tabW + 8 : 0;
           const room = frame.x1 - frame.x0 - 16 - tab;
-          const label = raw ? text(`[${raw as string}]`, small, true, Math.max(room, FRAME_TEXT)) : NO_LABEL;
+          const label = raw ? text(`[${raw as string}]`, small, true, Math.max(room, tight ? Math.min(FRAME_TEXT, wrapW) : FRAME_TEXT)) : NO_LABEL;
           if (label.width > room) frame.x1 += label.width - room;
           if (k === 0) frame.title = label;
           else frame.dividerLabels.push(label);
@@ -422,8 +434,8 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
       extend(frame.x0, frame.x1);
       const parent = open[open.length - 1];
       if (parent) {
-        parent.x0 = Math.min(parent.x0, frame.x0 - FRAME_NEST);
-        parent.x1 = Math.max(parent.x1, frame.x1 + FRAME_NEST);
+        parent.x0 = Math.min(parent.x0, frame.x0 - frameNest);
+        parent.x1 = Math.max(parent.x1, frame.x1 + frameNest);
       }
     } else if (view) {
       const a = cols[view.a];
@@ -435,9 +447,9 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
         else if (m.placement === PLACEMENT.RIGHTOF) view.x = a.x + NOTE_GAP;
         else if (view.a === view.b) view.x = a.x - view.w / 2;
         else {
-          const lo = Math.min(a.x, b.x) - NOTE_OVER;
-          const hi = Math.max(a.x, b.x) + NOTE_OVER;
-          if (m.wrap) view.label = text(m.message as string, small, true, Math.max(wrapW, hi - lo - 2 * notePad));
+          const lo = Math.min(a.x, b.x) - noteOver;
+          const hi = Math.max(a.x, b.x) + noteOver;
+          if (tight || m.wrap) view.label = text(m.message as string, small, true, Math.max(wrapW, hi - lo - 2 * notePad));
           view.w = Math.max(hi - lo, view.label.width + 2 * notePad);
           view.x = (lo + hi - view.w) / 2;
         }
@@ -449,7 +461,7 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
       } else {
         x0 = Math.min(a.x, b.x);
         x1 = Math.max(a.x, b.x);
-        if (m.wrap) view.label = text(m.message as string, small, true, Math.max(wrapW, x1 - x0 - 2 * MSG_PAD - ACT_W));
+        if (tight || m.wrap) view.label = text(m.message as string, small, true, Math.max(wrapW, x1 - x0 - 2 * msgPad - ACT_W));
         if (b.createAt === i) {
           if (b.x > a.x) x1 += b.size.w / 2;
           else x0 -= b.size.w / 2;
@@ -458,8 +470,8 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
       extend(x0, x1);
       const frame = open[open.length - 1];
       if (frame) {
-        frame.x0 = Math.min(frame.x0, x0 - FRAME_PAD);
-        frame.x1 = Math.max(frame.x1, x1 + FRAME_PAD);
+        frame.x0 = Math.min(frame.x0, x0 - framePad);
+        frame.x1 = Math.max(frame.x1, x1 + framePad);
       }
     }
   }
@@ -727,7 +739,7 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
         if (label.width > 0) {
           const l = Math.min(x0, x1);
           const r = Math.max(x0, x1);
-          const cx = align < 0 ? l + MSG_PAD + label.width / 2 : align > 0 ? r - MSG_PAD - label.width / 2 : (l + r) / 2;
+          const cx = align < 0 ? l + msgPad + label.width / 2 : align > 0 ? r - msgPad - label.width / 2 : (l + r) / 2;
           extend(cx - label.width / 2, cx + label.width / 2);
           labelsOut += `<g class="pele-edge-label" data-id="i${escText(m.id)}">${backed(label, cx, lineY - 4 - label.height / 2, '')}</g>`;
         }
@@ -778,7 +790,7 @@ export function renderSequence(db: SeqDb, config: Config, options: RenderOptions
 
   let minY = 0;
   let titleOut = '';
-  const title = text(db.title, size, false, wrapW, Style.Bold);
+  const title = text(db.title, size, false, tight ? titleRoom(options) : wrapW, Style.Bold);
   if (minX > maxX) extend(0, Math.max(title.width, 40));
   if (title.width > 0) {
     const cx = (minX + maxX) / 2;

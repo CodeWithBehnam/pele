@@ -1,3 +1,4 @@
+import { tighten, titleRoom } from '../common/fit-width.js';
 import { PeleError } from '../../errors.js';
 import type { Config } from '../../preprocess.js';
 import { esc, escText, labelSvg, num } from '../../svg/builder.js';
@@ -48,12 +49,16 @@ function leftLabel(label: Label, x: number, top: number, attrs: string): string 
 }
 
 export function renderC4(db: C4Db, _config: Config, options: RenderOptions): Rendered {
+  return tighten(options, (tight) => draw(db, _config, options, tight));
+}
+
+function draw(db: C4Db, _config: Config, options: RenderOptions, tight: boolean): Rendered {
   const size = options.fontSize ?? 16;
   const small = Math.round(size * 0.8125);
   const measurer = options.measurer ?? defaultMeasurer(options.fontFamily);
   const pad = options.padding ?? 8;
   const links: LinkInfo[] = [];
-  const { order, boxes } = layoutC4(db, measurer, size, small);
+  const { order, boxes } = layoutC4(db, measurer, size, small, tight ? Math.max(80, (options.maxWidth ?? 320) - 2 * pad) : undefined);
   const root = order[0];
 
   let minX = 0;
@@ -261,7 +266,7 @@ export function renderC4(db: C4Db, _config: Config, options: RenderOptions): Ren
     }
   }
 
-  const title = layoutLabel(db.title, false, measurer, size, 4000, Style.Bold);
+  const title = layoutLabel(db.title, false, measurer, size, tight ? titleRoom(options) : 4000, Style.Bold);
   const titleHeight = title.height > 0 ? title.height + 12 : 0;
   const inner = Math.max(maxX - minX, title.width);
   const width = Math.ceil(inner + 2 * pad);

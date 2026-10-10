@@ -3,9 +3,11 @@ import { escText, labelSvg, num } from '../../svg/builder.js';
 import { ARROW, marker } from '../../svg/edges.js';
 import { svgDocument } from '../../svg/root.js';
 import { RADIUS } from '../../svg/theme.js';
+import { literalLabel } from '../common/literal-label.js';
 import { layoutLabel, type Label } from '../../text/label.js';
 import { Style, defaultMeasurer, type TextMeasurer } from '../../text/measurer.js';
 import type { RenderOptions, Rendered } from '../../types.js';
+import { turnToFit, titleRoom } from '../common/fit-width.js';
 import type { IshikawaModel, IshikawaNode } from './types.js';
 
 // How far a bone moves toward the tail for each unit it rises from the spine.
@@ -128,10 +130,15 @@ function arrange(node: IshikawaNode, up: boolean, measurer: TextMeasurer, size: 
 }
 
 export function renderIshikawa(model: IshikawaModel, _config: Config, options: RenderOptions): Rendered {
+  return turnToFit(options, (down) => draw(model, _config, options, down));
+}
+
+function draw(model: IshikawaModel, _config: Config, options: RenderOptions, down: boolean): Rendered {
   const size = options.fontSize ?? 16;
   const small = Math.round(size * 0.875);
   const measurer = options.measurer ?? defaultMeasurer(options.fontFamily);
   const pad = options.padding ?? 8;
+  if (down) return verticalCauses(model, options);
   const root = model.root;
   const title = layoutLabel(model.title, false, measurer, size, 4000, Style.Bold);
   const titleHeight = title.height > 0 ? title.height + 12 : 0;
@@ -238,4 +245,48 @@ export function renderIshikawa(model: IshikawaModel, _config: Config, options: R
       (body ? `<g transform="translate(${num(ox)},${num(oy)})">${body}</g>` : '')
   );
   return { svg, width, height, links: [] };
+}
+
+function verticalCauses(model: IshikawaModel, options: RenderOptions): Rendered {
+  const size = options.fontSize ?? 16;
+  const small = Math.round(size * 0.875);
+  const measurer = options.measurer ?? defaultMeasurer(options.fontFamily);
+  const pad = options.padding ?? 8;
+  const room = Math.max(140, (options.maxWidth ?? 320) - 2 * pad);
+  const title = layoutLabel(model.title, false, measurer, size, titleRoom(options), Style.Bold);
+  const order: { node: IshikawaNode; depth: number; parent: number; x: number; y: number; w: number; h: number; label?: Label }[] = [];
+  // A stack retains the outline's depth-first order without using the JavaScript call stack.
+  const pending = model.root ? [{ node: model.root!, depth: 0, parent: -1 }] : [];
+  let depth = 0;
+  while (pending.length) {
+    const entry = pending.pop()!;
+    const index = order.length;
+    order.push({ ...entry, x: 0, y: 0, w: 0, h: 0 });
+    depth = Math.max(depth, entry.depth);
+    for (let i = entry.node.children.length - 1; i >= 0; i--) pending.push({ node: entry.node.children[i], depth: entry.depth + 1, parent: index });
+  }
+  const indent = Math.min(20, Math.max(2, (room - 120) / Math.max(1, depth)));
+  let y = pad + (title.height ? title.height + 12 : 0), width = title.width;
+  let nodes = '', edges = '';
+  for (const entry of order) {
+    entry.x = pad + entry.depth * indent;
+    entry.label = literalLabel(entry.node.text, measurer, entry.depth < 2 ? size : small, Math.max(60, room - entry.depth * indent - 20), entry.depth < 2 ? Style.Bold : 0);
+    entry.w = entry.label.width + 20;
+    entry.h = entry.label.height + 12;
+    entry.y = y;
+    y += entry.h + 12;
+    width = Math.max(width, entry.x - pad + entry.w);
+    const framed = entry.depth < 2;
+    nodes += `<g class="pele-node ${entry.depth === 0 ? 'pele-ishikawa-effect' : entry.depth === 1 ? 'pele-ishikawa-category' : 'pele-ishikawa-cause'}">` +
+      (framed ? `<rect x="${num(entry.x)}" y="${num(entry.y)}" width="${num(entry.w)}" height="${num(entry.h)}" rx="${entry.depth === 0 ? 12 : 4}" fill="var(--_s)" stroke="var(--_b)"/>` : '') +
+      labelSvg(entry.label, entry.x + entry.w / 2, entry.y + entry.h / 2, ` class="pele-label"${entry.depth < 2 ? ' font-weight="var(--_hw)"' : ''}${entry.depth > 1 ? ` font-size="${small}"` : ''}`) + '</g>';
+    if (entry.parent >= 0) {
+      const parent = order[entry.parent];
+      const gx = parent.x + indent / 2;
+      edges += `<path class="pele-edge" d="M${num(gx)},${num(parent.y + parent.h)}V${num(entry.y + entry.h / 2)}H${num(entry.x)}" fill="none" stroke="var(--_b)"/>`;
+    }
+  }
+  const totalWidth = Math.ceil(width + 2 * pad), height = Math.ceil(y + pad);
+  const content = labelSvg(title, totalWidth / 2, pad + title.height / 2, ' class="pele-title" font-weight="var(--_tw)"') + edges + nodes;
+  return { svg: svgDocument('ishikawa', totalWidth, height, size, options, {}, content), width: totalWidth, height, links: [] };
 }

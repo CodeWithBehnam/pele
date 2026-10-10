@@ -28,11 +28,11 @@ export function isFigure(kind: string): boolean {
   return FIGURES.has(kind);
 }
 
-export function actorSize(kind: string, label: Label, minW: number, minH: number): ActorSize {
+export function actorSize(kind: string, label: Label, minW: number, minH: number, paddingX = PAD_X): ActorSize {
   if (isFigure(kind)) return { w: Math.max(40, label.width + 8), h: GLYPH + (label.height > 0 ? GLYPH_GAP + label.height : 0) };
   const extra = kind === 'collections' ? STACK : kind === 'queue' ? 2 * CAP : 0;
   return {
-    w: Math.max(minW, label.width + 2 * PAD_X) + extra,
+    w: Math.max(minW, label.width + 2 * paddingX) + extra,
     h: Math.max(minH, label.height + 2 * PAD_Y) + (kind === 'collections' ? STACK : 0),
   };
 }

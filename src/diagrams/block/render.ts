@@ -7,6 +7,7 @@ import { RADIUS, classNames, resolveStyle, type ResolvedStyle } from '../../svg/
 import { layoutLabel, type Label } from '../../text/label.js';
 import { Style, defaultMeasurer } from '../../text/measurer.js';
 import type { RenderOptions, Rendered } from '../../types.js';
+import { tighten, titleRoom } from '../common/fit-width.js';
 import { OVERHANG, arrowAxis, arrowMask, arrowSize, drawArrow } from './arrows.js';
 import { layout, type Cell } from './layout.js';
 import type { Block, BlockModel } from './types.js';
@@ -323,13 +324,18 @@ function labelSpot(p: number[], at: number, w: number, h: number, s: View, t: Vi
 }
 
 export function renderBlock(model: BlockModel, config: Config, options: RenderOptions): Rendered {
+  return tighten(options, (tight) => draw(model, config, options, tight));
+}
+
+function draw(model: BlockModel, config: Config, options: RenderOptions, tight: boolean): Rendered {
   const size = options.fontSize ?? 16;
   const edgeSize = Math.round(size * 0.875);
   const measurer = options.measurer ?? defaultMeasurer(options.fontFamily);
   const pad = options.padding ?? 8;
   const icons = options.icons;
   const configured = (config.block as Config | undefined)?.padding;
-  const gap = typeof configured === 'number' && configured >= 0 ? Math.min(configured, 200) : GAP;
+  const gap = Math.min(typeof configured === 'number' && configured >= 0 ? Math.min(configured, 200) : GAP, tight ? 6 : Infinity);
+  const wrap = tight ? 80 : WRAP;
 
   const styleOf = (block: Block): ResolvedStyle => {
     const declarations: string[] = [];
@@ -361,16 +367,16 @@ export function renderBlock(model: BlockModel, config: Config, options: RenderOp
     let dy = 0;
     if (type === 'space') {
       kind = Kind.Space;
-      label = layoutLabel(undefined, false, measurer, fontSize, WRAP);
+      label = layoutLabel(undefined, false, measurer, fontSize, wrap);
     } else if (type === 'composite') {
       kind = Kind.Composite;
-      label = layoutLabel(block.label, false, measurer, fontSize, 4000, textStyle);
+      label = layoutLabel(block.label, false, measurer, fontSize, tight ? titleRoom(options) : 4000, textStyle);
       head = label.height > 0 ? label.height + 4 : 0;
       nw = label.width + 2 * gap;
       nh = head + 2 * gap;
     } else if (type === 'block_arrow') {
       kind = Kind.Arrow;
-      label = layoutLabel(block.label, false, measurer, fontSize, WRAP, textStyle);
+      label = layoutLabel(block.label, false, measurer, fontSize, wrap, textStyle);
       let blank = true;
       for (const line of label.lines) for (const part of line) if (part.icon !== undefined || part.text.trim() !== '') blank = false;
       mask = arrowMask(block.directions);
@@ -381,7 +387,7 @@ export function renderBlock(model: BlockModel, config: Config, options: RenderOp
       dy = s.dy;
     } else {
       shape = SHAPES.get(type ?? '') ?? 'rect';
-      label = layoutLabel(block.label, false, measurer, fontSize, WRAP, textStyle);
+      label = layoutLabel(block.label, false, measurer, fontSize, wrap, textStyle);
       const s = shapeSize(shape, label.width, label.height);
       nw = s.w;
       // A cylinder's caps deepen as it widens, so it is sized for the deepest ones.
@@ -513,7 +519,7 @@ export function renderBlock(model: BlockModel, config: Config, options: RenderOp
     routes.push({ edge: drawn[i], points, loop: s === t ? k + 1 : 0, label, lx, ly });
   }
 
-  const title = layoutLabel(model.title, false, measurer, size, 4000, Style.Bold);
+  const title = layoutLabel(model.title, false, measurer, size, tight ? titleRoom(options) : 4000, Style.Bold);
   const titleHeight = title.height > 0 ? title.height + 12 : 0;
   const inner = Math.max(maxX - minX, title.width);
   const ox = pad - minX + (inner - (maxX - minX)) / 2;

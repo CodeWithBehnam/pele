@@ -1,3 +1,4 @@
+import { tighten, titleRoom } from '../common/fit-width.js';
 import type { Config } from '../../preprocess.js';
 import { escText, labelSvg, num } from '../../svg/builder.js';
 import { edgeLabelSvg, marker, markerTrim } from '../../svg/edges.js';
@@ -207,9 +208,13 @@ function pathData(p: number[], startTrim: number, endTrim: number): string {
 }
 
 export function renderArchitecture(model: ArchitectureModel, config: Config, options: RenderOptions): Rendered {
+  return tighten(options, (tight) => draw(model, config, options, tight));
+}
+
+function draw(model: ArchitectureModel, config: Config, options: RenderOptions, tight: boolean): Rendered {
   const iconSize = setting(config, 'iconSize', 48, 8, 512);
   const size = setting(config, 'fontSize', options.fontSize ?? 16, 4, 128);
-  const groupPad = setting(config, 'padding', 20, 0, 256);
+  const groupPad = Math.min(setting(config, 'padding', 20, 0, 256), tight ? 12 : Infinity);
   const small = Math.round(size * 0.875);
   const measurer = options.measurer ?? defaultMeasurer(options.fontFamily);
   const pad = options.padding ?? 8;
@@ -228,7 +233,7 @@ export function renderArchitecture(model: ArchitectureModel, config: Config, opt
   const labels = new Array<Label>(N);
   const boxW = new Float64Array(N);
   const boxH = new Float64Array(N);
-  const wrap = Math.max(iconSize * 2.25, 96);
+  const wrap = tight ? Math.max(iconSize, 64) : Math.max(iconSize * 2.25, 96);
   for (let i = 0; i < N; i++) {
     const node = nodes[i];
     const label = layoutLabel(node.type === 'service' ? node.title : undefined, true, measurer, size, wrap);
@@ -254,7 +259,7 @@ export function renderArchitecture(model: ArchitectureModel, config: Config, opt
   const R = rowOf.size;
   const colW = new Float64Array(C);
   const rowH = new Float64Array(R);
-  const gap = Math.max(40, Math.round(iconSize * 0.75));
+  const gap = tight ? Math.max(24, 2 * STUB) : Math.max(40, Math.round(iconSize * 0.75));
   const gapX = new Float64Array(C).fill(gap);
   const gapY = new Float64Array(R).fill(gap);
   const nodeCol = new Int32Array(N);
@@ -320,7 +325,7 @@ export function renderArchitecture(model: ArchitectureModel, config: Config, opt
     c1[g] = colOf.get(grid.groupCol[g] + grid.groupCols[g] - 1)!;
     r0[g] = rowOf.get(grid.groupRow[g])!;
     r1[g] = rowOf.get(grid.groupRow[g] + grid.groupRows[g] - 1)!;
-    const label = layoutLabel(groups[g].title, true, measurer, size, 320);
+    const label = layoutLabel(groups[g].title, true, measurer, size, tight ? Math.max(80, titleRoom(options) / 2) : 320);
     groupLabels[g] = label;
     const icon = groups[g].icon ? badge : 0;
     headW[g] = label.width + icon + (label.width > 0 && icon > 0 ? 6 : 0);
@@ -544,7 +549,7 @@ export function renderArchitecture(model: ArchitectureModel, config: Config, opt
       '</g>';
   }
 
-  const title = layoutLabel(model.title, false, measurer, size, 4000, Style.Bold);
+  const title = layoutLabel(model.title, false, measurer, size, tight ? titleRoom(options) : 4000, Style.Bold);
   const titleHeight = title.height > 0 ? title.height + 12 : 0;
   const width = Math.ceil(Math.max(maxX - minX, title.width) + 2 * pad);
   const height = Math.ceil(maxY - minY + titleHeight + 2 * pad);
