@@ -14,6 +14,8 @@ const codeBlockLabel = (node) => {
 };
 const languageAliases = { typescript: 'ts', js: 'ts', javascript: 'ts', bash: 'shell', sh: 'shell', html: 'xml', svg: 'xml' };
 const plainCode = (value) => value.split('\n').map((line, index) => `<span class="doc-code-line"><span class="doc-line-number" hidden>${index + 1}</span><span class="doc-code-source">${escapeHtml(line)}</span></span>`).join('');
+// No `language-` class: Grammarly in Firefox runs Prism over every element it matches and leaves
+// [object Object] where the code was. The language is in `data-language`.
 const renderCodeBlock = (node) => {
   const label = codeBlockLabel(node);
   const language = languageAliases[node.lang] ?? node.lang ?? 'text';
@@ -21,7 +23,7 @@ const renderCodeBlock = (node) => {
   const caption = label
     ? `<figcaption><span>${escapeHtml(label)}</span><span class="doc-code-actions">${copyButton}</span></figcaption>`
     : copyButton;
-  return `<figure class="doc-code${label ? '' : ' doc-code-unlabeled'}" data-code-block>${caption}<pre><code class="language-${escapeHtml(language)}" data-language="${escapeHtml(language)}">${highlighted}</code></pre></figure>`;
+  return `<figure class="doc-code${label ? '' : ' doc-code-unlabeled'}" data-code-block>${caption}<pre><code data-language="${escapeHtml(language)}">${highlighted}</code></pre></figure>`;
 };
 
 function staticCodeBlocks() {
