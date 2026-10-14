@@ -13,9 +13,12 @@ import { linked, sanitizeUrl } from '../../util/url.js';
 import { leftLabelSvg } from '../common/literal-label.js';
 import type { C4Db } from './db.js';
 import { HEAD_LEFT, HEAD_TOP, layoutC4 } from './layout.js';
-import { HEAD, LANE, crosses, cylRy, queueRx, route, type Box } from './route.js';
+import { HEAD, LANE, Lanes, crosses, cylRy, queueRx, route, type Box } from './route.js';
 
 const PAIR_SHIFT = 7;
+// The gap between columns in a narrow drawing, and how much it grows at a time when its lanes need more.
+const NARROW_GAP = 36;
+const WIDEN = 24;
 const MAX_OFFSET = 2000;
 // A label may cover this much of a shape's edge, where there is no text.
 const EDGE = 8;
@@ -39,16 +42,26 @@ function link(body: string, url: string | undefined, id: string, links: LinkInfo
 }
 
 export function renderC4(db: C4Db, _config: Config, options: RenderOptions): Rendered {
-  return tighten(options, (tight) => draw(db, _config, options, tight));
+  return tighten(options, (tight) => {
+    if (!tight) return draw(db, _config, options, false)[0];
+    // A narrow drawing sets its columns close together. Where the relations between them need more
+    // lanes than that leaves room for, the columns are set further apart, a step at a time.
+    let [best, squeezed] = draw(db, _config, options, true, NARROW_GAP);
+    for (let gap = NARROW_GAP + WIDEN; squeezed > 0 && gap <= NARROW_GAP + 3 * WIDEN; gap += WIDEN) {
+      const [wider, left] = draw(db, _config, options, true, gap);
+      if (left < squeezed) [best, squeezed] = [wider, left];
+    }
+    return best;
+  });
 }
 
-function draw(db: C4Db, _config: Config, options: RenderOptions, tight: boolean): Rendered {
+function draw(db: C4Db, _config: Config, options: RenderOptions, tight: boolean, gap = NARROW_GAP): [Rendered, number] {
   const size = options.fontSize ?? 16;
   const small = Math.round(size * 0.8125);
   const measurer = options.measurer ?? defaultMeasurer(options.fontFamily);
   const pad = options.padding ?? 8;
   const links: LinkInfo[] = [];
-  const { order, boxes } = layoutC4(db, measurer, size, small, tight ? Math.max(80, (options.maxWidth ?? 320) - 2 * pad) : undefined);
+  const { order, boxes } = layoutC4(db, measurer, size, small, tight ? Math.max(80, (options.maxWidth ?? 320) - 2 * pad) : undefined, gap);
   const root = order[0];
 
   let minX = 0;
@@ -105,7 +118,8 @@ function draw(db: C4Db, _config: Config, options: RenderOptions, tight: boolean)
   // Every line is drawn before any label is placed, so that labels can keep off the arrowheads.
   let edgesOut = '';
   const trim = markerTrim('arrow_point');
-  const lanes = new Map<number, number>();
+  const lanes = new Lanes();
+  for (const group of order) if (group !== root) lanes.frame(group);
   const routes = db.rels.map((rel, index) => {
     const a = ends[index * 2];
     const b = ends[index * 2 + 1];
@@ -281,5 +295,5 @@ function draw(db: C4Db, _config: Config, options: RenderOptions, tight: boolean)
       (labelsOut ? `<g class="pele-edge-labels" font-size="${small}">${labelsOut}</g>` : '') +
       '</g>'
   );
-  return { svg, width, height, links };
+  return [{ svg, width, height, links }, lanes.squeezed];
 }

@@ -269,6 +269,91 @@ Rel(d, q, "y")`);
     expect(draw('C4Context\nSystem(a, "A")\nSystem(b, "B")\nRel(a, b, "x")').svg).not.toContain('Q');
   });
 
+  // The corners of each relation's line, read back from its path; a loop has none.
+  const corners = (svg: string): Map<string, number[]> => {
+    const out = new Map<string, number[]>();
+    for (const [, id, d] of svg.matchAll(/class="pele-edge" data-id="([^"]+)"[^>]*><path d="([^"]+)"/g)) {
+      if (d.includes('C')) continue;
+      const points: number[] = [];
+      for (const [, op, args] of d.matchAll(/([MLHVQ])([^MLHVQ]+)/g)) {
+        const n = args.trim().split(/[\s,]+/).map(Number);
+        const [x, y] = points.length ? points.slice(-2) : [0, 0];
+        if (op === 'H') points.push(n[0], y);
+        else if (op === 'V') points.push(x, n[0]);
+        // A rounded corner is read as the corner itself.
+        else if (op === 'Q') points.push(n[0], n[1]);
+        else points.push(n[n.length - 2], n[n.length - 1]);
+      }
+      out.set(id, points);
+    }
+    return out;
+  };
+  const component = (JSON.parse(readFileSync('tests/corpus/c4-docs.json', 'utf8')) as string[]).find(source => source.includes('Accounts Summary Controller'))!;
+
+  it('keeps every line clear of the shapes it does not join', () => {
+    const sources = JSON.parse(readFileSync('tests/corpus/c4-docs.json', 'utf8')) as string[];
+    const behind = new Set<string>();
+    for (const source of sources) {
+      const rels = model(source).rels;
+      for (const maxWidth of [undefined, 640, 480, 320]) {
+        const { svg } = render(source, { ...options, maxWidth });
+        // A cylinder is a path; its box here leaves out the bulge of its caps.
+        const shapes = [...svg.matchAll(/class="pele-node[^"]*" data-id="([^"]+)" transform="translate\(([-\d.]+),([-\d.]+)\)">(?:<a [^>]*>)?<(rect|path d="M([-\d.]+),([-\d.]+)([HV])([-\d.]+))/g)].map(match => {
+          if (match[4] === 'rect') return [match[1], box(svg, match[1])] as const;
+          const [cx, cy, mx, my, end] = [match[2], match[3], match[5], match[6], match[8]].map(Number);
+          const w = match[7] === 'H' ? end - mx : -2 * mx, h = match[7] === 'V' ? end - my : -2 * my;
+          return [match[1], { x: cx + mx, y: cy + my, w, h }] as const;
+        });
+        const lines = [...corners(svg)];
+        lines.forEach(([id, points], index) => {
+          const rel = rels.find(r => `${r.from}-${r.to}` === id) ?? rels[index];
+          for (const [name, b] of shapes) {
+            if (name === rel.from || name === rel.to) continue;
+            for (let i = 2; i < points.length; i += 2) {
+              const [x0, y0, x1, y1] = [points[i - 2], points[i - 1], points[i], points[i + 1]];
+              // Sampled along the stretch: a point inside the shape, by more than a pixel, is behind it.
+              for (let t = 0; t <= 1; t += 0.02) {
+                const x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
+                const inside = x > b.x + 1 && x < b.x + b.w - 1 && y > b.y + 1 && y < b.y + b.h - 1;
+                if (inside) {
+                  behind.add(`${id} behind ${name} at ${maxWidth ?? 'full'} width in ${source.split('\n')[1].trim()}`);
+                  break;
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+    // In the full container diagram no line with two corners goes around Mobile App, so one stays behind it.
+    expect([...behind]).toEqual(['backend_api-banking_system behind mobile_app at full width in title Container diagram for Internet Banking System']);
+  });
+
+  it('bends a line that would cross behind a shape through the gap between columns, apart from the others there', () => {
+    const { svg } = render(component, { ...options, maxWidth: 640 });
+    const lines = corners(svg);
+    const lane = (id: string): number => {
+      const points = lines.get(id)!;
+      // Across, along the gap, and across again, at right angles.
+      for (let i = 2; i < points.length; i += 2) expect(points[i] === points[i - 2] || points[i + 1] === points[i - 1], id).toBe(true);
+      return points[4];
+    };
+    const spa = box(svg, 'spa'), accounts = box(svg, 'accounts');
+    for (const id of ['spa-accounts', 'ma-sign']) {
+      expect(lane(id)).toBeGreaterThan(spa.x + spa.w);
+      expect(lane(id)).toBeLessThan(accounts.x);
+    }
+    expect(Math.abs(lane('spa-accounts') - lane('ma-sign'))).toBeGreaterThanOrEqual(10);
+  });
+
+  it('takes a detour along the outside of the drawing when its column is at the edge', () => {
+    const { svg } = render(component, { ...options, maxWidth: 640 });
+    const lines = corners(svg);
+    const spa = box(svg, 'spa'), mbs = box(svg, 'mbs');
+    expect(lines.get('spa-sign')![4]).toBeLessThan(spa.x);
+    expect(lines.get('mbsfacade-mbs')![4]).toBeGreaterThan(mbs.x + mbs.w);
+  });
+
   it('separates two relations that run opposite ways and puts their labels on either side', () => {
     const { svg } = draw('C4Context\nSystem(a, "A")\nSystem(b, "B")\nRel(a, b, "there")\nRel(b, a, "back")');
     const y = (id: string): number => Number(new RegExp(`data-id="${id}"><path d="M[\\d.]+,([\\d.]+)L`).exec(svg)![1]);
