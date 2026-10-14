@@ -52,6 +52,27 @@ const spying = (seen: (o: RenderOptions) => void, parsed?: () => void): Engine =
     return render(model, { ...o, measurer: metricsMeasurer });
   },
 });
+// A document's fonts as mount() reads them: whether any are loading, and a promise for when none are.
+const fontSet = () => {
+  let finish = (): void => {};
+  const fonts = { status: 'loaded', ready: Promise.resolve() as Promise<unknown> };
+  return {
+    fonts,
+    loading(): void {
+      fonts.status = 'loading';
+      fonts.ready = new Promise((resolve) => {
+        finish = () => {
+          fonts.status = 'loaded';
+          resolve(fonts);
+        };
+      });
+    },
+    async loaded(): Promise<void> {
+      finish();
+      for (let i = 0; i < 3; i++) await Promise.resolve();
+    },
+  };
+};
 const SANKEY = 'sankey\n\nGrid,Homes,113\nGrid,Industry,342\nGrid,Losses,56\n';
 const FLOW = 'flowchart LR\n  A[One] --> B[Two] --> C[Three] --> D[Four] --> E[Five] --> F[Six] --> G[Seven]';
 
@@ -149,7 +170,7 @@ describe('mount', () => {
   interface Styled { fontFamily: string; vars?: Record<string, string> }
   const styled = (container: Styled, drawing?: Styled) => {
     const child = {};
-    const listeners = new Set<(event: unknown) => void>();
+    const set = fontSet();
     const el = {
       clientWidth: 500,
       html: '',
@@ -163,12 +184,7 @@ describe('mount', () => {
       },
       addEventListener() {},
       removeEventListener() {},
-      ownerDocument: {
-        fonts: {
-          addEventListener: (_: string, listener: (event: unknown) => void) => listeners.add(listener),
-          removeEventListener: (_: string, listener: (event: unknown) => void) => listeners.delete(listener),
-        },
-      },
+      ownerDocument: { fonts: set.fonts },
     };
     globals.getComputedStyle = (target: unknown) => {
       const style = target === child && drawing ? drawing : container;
@@ -176,11 +192,7 @@ describe('mount', () => {
     };
     const seen: string[] = [];
     const spy = spying((o) => seen.push(`${o.fontFamily}|${o.fontFamilyMono}`));
-    const loaded = () => {
-      const event = {};
-      for (const listener of [...listeners]) listener(event);
-    };
-    return { el: el as unknown as HTMLElement, seen, spy, loaded, listeners };
+    return { el: el as unknown as HTMLElement, seen, spy, fonts: set };
   };
 
   it('takes its fonts from the variables where they are set', () => {
@@ -204,17 +216,26 @@ describe('mount', () => {
     expect([...new Set(seen)]).toEqual(['Inter|undefined']);
   });
 
-  it('measures again when a font has loaded, and leaves the element alone if nothing moved', () => {
-    const { el, seen, spy, loaded } = styled({ fontFamily: 'Georgia' });
+  it('measures again once fonts that were loading have loaded, and leaves the element alone if nothing moved', async () => {
+    const { el, seen, spy, fonts } = styled({ fontFamily: 'Georgia' });
+    fonts.loading();
     let renders = 0;
     const handle = mountWith(spy, el, FLOW, { onRender: () => renders++ });
     const drawn = seen.length;
-    loaded();
+    await fonts.loaded();
     expect(seen.length).toBeGreaterThan(drawn);
     expect(renders).toBe(1);
-    handle.destroy();
+    // Fonts that load after it was drawn while none were loading leave it alone. It was not
+    // measured with them.
     const after = seen.length;
-    loaded();
+    fonts.loading();
+    await fonts.loaded();
+    expect(seen.length).toBe(after);
+    // Nor does a diagram that was stopped wait for them.
+    fonts.loading();
+    handle.refresh();
+    handle.destroy();
+    await fonts.loaded();
     expect(seen.length).toBe(after);
   });
 
@@ -261,7 +282,8 @@ describe('mount', () => {
   it('updates, reports errors as render does, and stops when destroyed', () => {
     const el = element(340);
     const handle = mount(el, SANKEY, options);
-    expect(handle.update(FLOW).type).toBe('flowchart');
+    handle.update(FLOW);
+    expect(handle.result.type).toBe('flowchart');
     expect(el.innerHTML).toBe(render(FLOW, { ...options, maxWidth: 320 }).svg);
     expect(() => handle.update('flowchart LR\n  A -->')).toThrow(PeleError);
     expect(el.innerHTML).toBe(render(FLOW, { ...options, maxWidth: 320 }).svg);
@@ -282,40 +304,30 @@ describe('mount', () => {
     handle.destroy();
   });
 
-  // A document whose fonts keep their listeners, as a browser's do, and elements to mount in it.
+  // A document with fonts, and elements to mount in it.
   const page = () => {
-    const listeners = new Set<(event: unknown) => void>();
-    const ownerDocument = {
-      fonts: {
-        addEventListener: (_: string, listener: (event: unknown) => void) => listeners.add(listener),
-        removeEventListener: (_: string, listener: (event: unknown) => void) => listeners.delete(listener),
-      },
-    };
+    const set = fontSet();
+    const ownerDocument = { fonts: set.fonts };
     const make = (clientWidth: number) =>
       ({ clientWidth, innerHTML: '', firstElementChild: null, isConnected: true, ownerDocument, addEventListener() {}, removeEventListener() {} }) as unknown as HTMLElement;
-    const loaded = () => {
-      for (const listener of [...listeners]) listener({});
-    };
-    return { element: make, loaded, listeners };
+    return { element: make, fonts: set };
   };
   const connect = (target: HTMLElement, connected: boolean): void => {
     (target as unknown as { isConnected: boolean }).isConnected = connected;
   };
 
-  it('listens to a document\'s fonts once, however many diagrams are in it', () => {
+  it('draws every diagram that was measured while fonts were loading again once they have loaded', async () => {
     const doc = page();
+    doc.fonts.loading();
     let draws = 0;
     const spy = spying(() => draws++);
     const handles = [1, 2, 3].map(() => mountWith(spy, doc.element(500), FLOW));
-    expect(doc.listeners.size).toBe(1);
-    draws = 0;
-    doc.loaded();
-    const all = draws;
-    expect(all).toBeGreaterThan(0);
     handles[0].destroy();
     draws = 0;
-    doc.loaded();
-    expect(draws).toBe((all / 3) * 2);
+    await doc.fonts.loaded();
+    const each = draws / 2;
+    expect(each).toBeGreaterThan(0);
+    expect(Number.isInteger(each)).toBe(true);
   });
 
   it('does not keep an element that the page has dropped', async () => {
@@ -323,48 +335,34 @@ describe('mount', () => {
     delete globals.ResizeObserver;
     const doc = page();
     const dropped: WeakRef<HTMLElement>[] = [];
-    // Every reference the library makes to an element, itself held weakly here.
-    const references: WeakRef<object>[] = [];
-    const Weak = WeakRef;
-    globals.WeakRef = class<T extends object> extends Weak<T> {
-      constructor(target: T) {
-        super(target);
-        references.push(new Weak(this));
-      }
-    };
-    const kept = doc.element(500);
-    let draws = 0;
-    mountWith(spying(() => draws++), kept, FLOW);
-    (() => {
+    const drop = (): void => {
       for (let i = 0; i < 20; i++) {
         const el = doc.element(500);
         mount(el, FLOW, options);
-        dropped.push(new Weak(el));
+        dropped.push(new WeakRef(el));
       }
-    })();
-    globals.WeakRef = Weak;
+    };
+    drop();
+    // One dropped while fonts were loading is held until they have loaded, and no longer.
+    doc.fonts.loading();
+    drop();
+    await doc.fonts.loaded();
     for (let i = 0; i < 12; i++) {
       await new Promise((resolve) => setTimeout(resolve, 0));
       collect();
     }
     expect(dropped.filter((ref) => ref.deref() !== undefined).length).toBe(0);
-    // Nor what it kept about them, with no font having loaded since: only the reference to the
-    // one the page still has is left.
-    expect(references.filter((ref) => ref.deref() !== undefined).length).toBe(1);
-    // That one is still drawn again when a font loads.
-    draws = 0;
-    doc.loaded();
-    expect(draws).toBeGreaterThan(0);
   });
 
-  it('leaves a diagram that is out of the document alone when a font loads, and draws it when it is back', () => {
+  it('leaves a diagram that is out of the document alone when a font loads, and draws it when it is back', async () => {
     const doc = page();
     const el = doc.element(500);
+    doc.fonts.loading();
     let draws = 0;
     mountWith(spying(() => draws++), el, FLOW);
     connect(el, false);
     draws = 0;
-    doc.loaded();
+    await doc.fonts.loaded();
     expect(draws).toBe(0);
     connect(el, true);
     resize(el, 500);
@@ -378,7 +376,9 @@ describe('mount', () => {
     globals.getComputedStyle = () => ({ fontFamily: '', paddingLeft: '0px', paddingRight: '0px', getPropertyValue: () => '' });
     seen.length = 0;
     handle.update(FLOW.replace('Seven', 'Eight'));
+    // There are no fonts to draw it with there. What is drawn is a guess, so that the text shows.
     expect([...new Set(seen)]).toEqual(['undefined|undefined']);
+    expect(el.innerHTML).toContain('Eight');
     globals.getComputedStyle = () => ({ fontFamily: 'Georgia', paddingLeft: '0px', paddingRight: '0px', getPropertyValue: () => '' });
     connect(el, true);
     seen.length = 0;
@@ -412,43 +412,34 @@ describe('mount', () => {
     // The element, the result and what a later draw starts from all agree.
     expect(handle.result.type).toBe('flowchart');
     expect(el.innerHTML).toBe(handle.result.svg);
-    expect(handle.refresh().type).toBe('flowchart');
+    handle.refresh();
+    expect(handle.result.type).toBe('flowchart');
     resize(el, 340);
     expect(handle.result.type).toBe('flowchart');
     expect(el.innerHTML).toBe(handle.result.svg);
   });
 
-  it('measures with the fonts of the window an element was moved to when refreshed, and watches from there', () => {
+  it('measures with the fonts of the window an element was moved to when refreshed, and observes it from there', () => {
     const makeWindow = (fontFamily: string) => {
-      const listeners = new Set<(event: unknown) => void>();
       const view = {
         getComputedStyle: () => ({ fontFamily, paddingLeft: '0px', paddingRight: '0px', getPropertyValue: () => '' }),
         ResizeObserver: globals.ResizeObserver,
       };
-      const ownerDocument = { defaultView: view, fonts: { addEventListener: (_: string, listener: (event: unknown) => void) => listeners.add(listener) } };
-      return { ownerDocument, loaded: () => [...listeners].forEach((listener) => listener({})) };
+      return { defaultView: view, fonts: fontSet().fonts };
     };
     const first = makeWindow('Georgia');
     const second = makeWindow('Inter');
-    const el = { clientWidth: 500, innerHTML: '', firstElementChild: null, isConnected: true, ownerDocument: first.ownerDocument, addEventListener() {}, removeEventListener() {} };
+    const el = { clientWidth: 500, innerHTML: '', firstElementChild: null, isConnected: true, ownerDocument: first, addEventListener() {}, removeEventListener() {} };
     const seen: string[] = [];
-    for (const watch of [true, false]) {
-      el.ownerDocument = first.ownerDocument;
-      const handle = mountWith(spying((o) => seen.push(o.fontFamily ?? '')), el as unknown as HTMLElement, FLOW, { watch });
-      el.ownerDocument = second.ownerDocument;
-      // Fitting keeps the measurements it has. Only a refresh reads the fonts again.
-      seen.length = 0;
-      handle.fit();
-      expect([...new Set(seen)], String(watch)).toEqual([]);
-      handle.refresh();
-      expect([...new Set(seen)], String(watch)).toEqual(['Inter']);
-      seen.length = 0;
-      first.loaded();
-      expect(seen.length, String(watch)).toBe(0);
-      second.loaded();
-      expect(seen.length > 0, String(watch)).toBe(watch);
-      handle.destroy();
-    }
+    mountWith(spying((o) => seen.push(o.fontFamily ?? '')), el as unknown as HTMLElement, FLOW);
+    expect([...new Set(seen)]).toEqual(['Georgia']);
+    expect(observers.map((observer) => observer.connected)).toEqual([true]);
+    el.ownerDocument = second;
+    seen.length = 0;
+    observers[0].fire();
+    // An observer from the first window: the diagram is now observed from the second.
+    expect([...new Set(seen)]).toEqual(['Inter']);
+    expect(observers.map((observer) => observer.connected)).toEqual([false, true]);
   });
 
   it('parses the text once, however often it is drawn', () => {
@@ -458,7 +449,6 @@ describe('mount', () => {
     const handle = mountWith(spying(() => draws++, () => parses++), el, SANKEY);
     resize(el, 420);
     resize(el, 340);
-    handle.refresh();
     handle.update(SANKEY);
     expect(draws).toBeGreaterThan(4);
     expect(parses).toBe(1);
@@ -467,45 +457,77 @@ describe('mount', () => {
     expect(parses).toBe(3);
   });
 
-  it('observes nothing when told not to watch, and is fitted and refreshed by its host', () => {
-    const doc = page();
-    const el = doc.element(1000);
+  it('draws again on refresh only when the width or the fonts have changed', () => {
+    const el = element(1000);
     const seen: string[] = [];
-    const handle = mountWith(spying((o) => seen.push(o.fontFamily ?? '')), el, SANKEY, { watch: false });
-    expect(observers.length).toBe(0);
-    expect(doc.listeners.size).toBe(0);
-    const natural = handle.result.width;
+    const handle = mountWith(spying((o) => seen.push(o.fontFamily ?? '')), el, SANKEY);
+    // One observer for the diagram and its zoom.
+    expect(observers.length).toBe(1);
+    seen.length = 0;
+    handle.refresh();
+    expect(seen).toEqual([]);
 
     (el as unknown as { clientWidth: number }).clientWidth = 340;
-    expect(handle.fit().width).toBe(320);
-    (el as unknown as { clientWidth: number }).clientWidth = 1000;
-    expect(handle.fit().width).toBe(natural);
+    handle.refresh();
+    expect(handle.result.width).toBe(320);
 
     globals.getComputedStyle = () => ({ fontFamily: 'Inter', paddingLeft: '0px', paddingRight: '0px', getPropertyValue: () => '' });
     seen.length = 0;
     handle.refresh();
     expect([...new Set(seen)]).toEqual(['Inter']);
-
-    // One that is out of the document waits for fit() to be called when it is back.
-    connect(el, false);
-    globals.getComputedStyle = () => ({ fontFamily: 'Georgia', paddingLeft: '0px', paddingRight: '0px', getPropertyValue: () => '' });
     seen.length = 0;
     handle.refresh();
-    expect(seen.length).toBe(0);
-    connect(el, true);
-    handle.fit();
-    expect([...new Set(seen)]).toEqual(['Georgia']);
+    expect(seen).toEqual([]);
   });
 
-  it('stops the diagram an element had when another is mounted in it', () => {
+  it('leaves a hidden diagram alone, and draws what it missed when it is shown', () => {
+    const el = element(500);
+    const seen: string[] = [];
+    const handle = mountWith(spying((o) => seen.push(o.fontFamily ?? '')), el, SANKEY);
+    resize(el, 0);
+    globals.getComputedStyle = () => ({ fontFamily: 'Inter', paddingLeft: '0px', paddingRight: '0px', getPropertyValue: () => '' });
+    seen.length = 0;
+    handle.refresh();
+    handle.update(FLOW);
+    expect(seen).toEqual([]);
+    expect(handle.result.type).toBe('sankey');
+    // Text that cannot be parsed still throws at once.
+    expect(() => handle.update('flowchart LR\n  A -->')).toThrow(PeleError);
+    resize(el, 500);
+    expect([...new Set(seen)]).toEqual(['Inter']);
+    expect(handle.result.type).toBe('flowchart');
+    expect(el.innerHTML).toBe(handle.result.svg);
+  });
+
+  it('puts in the element what a host makes of the markup', () => {
+    const made: string[] = [];
+    const children: unknown[] = [];
+    const el = { ...element(500), replaceChildren: (...nodes: unknown[]) => children.splice(0, children.length, ...nodes) } as unknown as HTMLElement;
+    const handle = mount(el, SANKEY, {
+      ...options,
+      sanitize: (svg) => {
+        made.push(svg);
+        return { node: made.length } as unknown as Node;
+      },
+    });
+    expect(made).toEqual([handle.result.svg]);
+    expect(children).toEqual([{ node: 1 }]);
+    expect(el.innerHTML).toBe('');
+    resize(el, 340);
+    expect(made[1]).toBe(handle.result.svg);
+    expect(children).toEqual([{ node: 2 }]);
+  });
+
+  it('stops the diagram an element had when another is mounted in it', async () => {
     const doc = page();
     const el = doc.element(500);
+    doc.fonts.loading();
     let first = 0;
     let second = 0;
     mountWith(spying(() => first++), el, FLOW);
     mountWith(spying(() => second++), el, SANKEY);
     first = 0;
-    doc.loaded();
+    await doc.fonts.loaded();
     resize(el, 340);
     expect(first).toBe(0);
     expect(second).toBeGreaterThan(0);

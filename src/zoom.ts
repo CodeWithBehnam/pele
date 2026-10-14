@@ -11,9 +11,6 @@ export interface ZoomOptions {
   controls?: boolean;
   // What the buttons are called, for a page that is not in English.
   labels?: { zoomIn?: string; zoomOut?: string; reset?: string };
-  // Whether the element's size is watched, so that an enlarged drawing goes back to the size
-  // that fits when it changes. It is by default. A host that passes `false` calls resized().
-  watch?: boolean;
 }
 
 export interface Zoom {
@@ -26,8 +23,6 @@ export interface Zoom {
   reset(): void;
   // Starts over with the drawing the element holds now.
   refresh(): void;
-  // Goes back to the size that fits if the element's size has changed. For `watch: false`.
-  resized(): void;
   destroy(): void;
 }
 
@@ -80,6 +75,11 @@ const LABELS = { zoomIn: 'Zoom in', zoomOut: 'Zoom out', reset: 'Reset zoom' };
 // Lets the drawing in an element be enlarged and moved about inside its own box: by pinching,
 // by the wheel with Ctrl or ⌘ held, by dragging, by a double click, and from the keyboard.
 export function enableZoom(element: HTMLElement, options: ZoomOptions = {}): Zoom {
+  return zoomWith(element, options, true);
+}
+
+// A zoom that observes its element's size, or one whose host calls resized() when it changes.
+export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: boolean): Zoom & { resized(): void } {
   let svg: SVGSVGElement | null = null;
   let natural = { width: 0, height: 0 };
   let rest = { width: 0, height: 0 };
@@ -179,6 +179,7 @@ export function enableZoom(element: HTMLElement, options: ZoomOptions = {}): Zoo
     svg.style.touchAction = zoomable() ? 'pan-y' : '';
     if (zoomable()) svg.setAttribute('tabindex', '0');
     else svg.removeAttribute('tabindex');
+    take(zoomable());
     offer();
   };
 
@@ -241,7 +242,7 @@ export function enableZoom(element: HTMLElement, options: ZoomOptions = {}): Zoo
   let observer: ResizeObserver | undefined;
   let observed: typeof globalThis | undefined;
   const watch = (): void => {
-    if (options.watch === false) return;
+    if (!observe) return;
     const next = view();
     if (next === observed) return;
     observer?.disconnect();
@@ -257,6 +258,7 @@ export function enableZoom(element: HTMLElement, options: ZoomOptions = {}): Zoo
     scale = 0;
     if (!svg) {
       bar?.remove();
+      take(false);
       return;
     }
     natural = { width: Number(svg.getAttribute('width')) || 0, height: Number(svg.getAttribute('height')) || 0 };
@@ -380,15 +382,29 @@ export function enableZoom(element: HTMLElement, options: ZoomOptions = {}): Zoo
     ['pointerup', onPointerUp as EventListener],
     ['pointercancel', onPointerUp as EventListener],
     ['click', onClick as EventListener, { capture: true }],
-    ['wheel', onWheel as EventListener, { passive: false }],
     ['dblclick', onDoubleClick as EventListener],
     ['keydown', onKeyDown as EventListener],
     ['focusin', onFocus],
-    ['gesturestart', onGestureStart],
-    ['gesturechange', onGestureChange],
-    ['gestureend', onGestureEnd],
   ];
   for (const [type, listener, how] of listeners) element.addEventListener(type, listener, how);
+  // Taken only while the drawing can be enlarged. A wheel listener that may stop the wheel makes
+  // the browser wait for the page's script before it scrolls, so a drawing that fits adds none.
+  const gestures: [string, EventListener, AddEventListenerOptions][] = [
+    ['wheel', onWheel as EventListener, { passive: false }],
+    ['gesturestart', onGestureStart, { passive: false }],
+    ['gesturechange', onGestureChange, { passive: false }],
+    ['gestureend', onGestureEnd, { passive: false }],
+  ];
+  let taking = false;
+  function take(on: boolean): void {
+    if (on === taking) return;
+    taking = on;
+    for (const [type, listener, how] of gestures) {
+      if (on) element.addEventListener(type, listener, how);
+      else element.removeEventListener(type, listener, how);
+    }
+    if (!on) gesture = 0;
+  }
 
   watched = element.clientWidth + element.clientHeight;
   refresh();
@@ -418,6 +434,7 @@ export function enableZoom(element: HTMLElement, options: ZoomOptions = {}): Zoo
       bar?.remove();
       if (positioned) element.style.position = '';
       observer?.disconnect();
+      take(false);
       for (const [type, listener, how] of listeners) element.removeEventListener(type, listener, how);
     },
   };

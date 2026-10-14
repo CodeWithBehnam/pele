@@ -84,6 +84,8 @@ try {
 
 **SVG changes need review.** These guarantees apply to the returned SVG. Check any transformations your app applies before displaying it.
 
+**A sanitizer can check the SVG too.** To pass each SVG through your app's HTML sanitizer before it is inserted, give [`mount()`](/api#mount) a `sanitize` function. Check that it keeps SVG elements, `viewBox`, and the `target` of links. It runs after every resize that changes the layout, so measure it on a large diagram.
+
 ## Reporting a vulnerability
 
 Report a security problem privately through [GitHub](https://github.com/obsidianmd/pele/security/advisories/new), not in a public issue.

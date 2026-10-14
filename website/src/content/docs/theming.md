@@ -109,7 +109,7 @@ Pele measures labels to size nodes, so it needs the font before rendering.
 }
 ```
 
-A font change takes effect at the next render. `mount()` re-renders when a web font finishes loading. Call `refresh()` after any other change, such as a theme or font setting.
+A font change takes effect at the next render. `mount()` re-renders a diagram that was rendered while a web font was loading once it has loaded. Call `refresh()` after any other change, such as a theme or font setting.
 
 [`render()`](/api#render) has no container to read. Pass the font with [`fontFamily`](/api#renderoptions). The SVG is drawn in that font unless `--pele-font` is set.
 

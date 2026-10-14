@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { frame } from '../src/zoom.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { enableZoom, frame } from '../src/zoom.js';
 
 // A drawing 1200 by 300, shrunk to fit a box 400 wide.
 const natural = { width: 1200, height: 300 };
@@ -42,5 +42,69 @@ describe('zoom frame', () => {
     // Where it rests inside the panel is kept: a point between the two ends is left alone.
     const resting = frame(small, panel, 2, -40, -60);
     expect([resting.x, resting.y]).toEqual([-40, -60]);
+  });
+});
+
+// An element holding a drawing 1200 wide that is shown `shown` wide, and the listeners it has.
+const drawingIn = (shown: number) => {
+  const listening = new Map<string, number>();
+  const attributes: Record<string, string> = { width: '1200', height: '300' };
+  const svg = {
+    localName: 'svg',
+    style: {},
+    getAttribute: (name: string) => attributes[name] ?? null,
+    setAttribute: (name: string, value: string) => (attributes[name] = value),
+    removeAttribute: (name: string) => delete attributes[name],
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: shown, height: shown / 4 }),
+  };
+  const count = (type: string, by: number) => listening.set(type, (listening.get(type) ?? 0) + by);
+  const element = {
+    firstElementChild: svg,
+    clientWidth: shown,
+    clientHeight: shown / 4,
+    style: {},
+    addEventListener: (type: string) => count(type, 1),
+    removeEventListener: (type: string) => count(type, -1),
+  };
+  return {
+    element: element as unknown as HTMLElement,
+    listening: (type: string) => listening.get(type) ?? 0,
+    show: (width: number) => {
+      shown = width;
+      element.clientWidth = width;
+      element.clientHeight = width / 4;
+    },
+  };
+};
+
+describe('zoom', () => {
+  const globals = globalThis as Record<string, unknown>;
+  beforeEach(() => {
+    globals.getComputedStyle = () => ({ position: 'relative', getPropertyValue: () => '0px' });
+  });
+  afterEach(() => {
+    delete globals.getComputedStyle;
+  });
+
+  it('takes the wheel only while the drawing can be enlarged', () => {
+    const fits = drawingIn(1200);
+    enableZoom(fits.element, { controls: false });
+    expect(fits.listening('wheel')).toBe(0);
+    expect(fits.listening('gesturestart')).toBe(0);
+    expect(fits.listening('pointerdown')).toBe(1);
+
+    const shrunk = drawingIn(400);
+    const zoom = enableZoom(shrunk.element, { controls: false });
+    expect(shrunk.listening('wheel')).toBe(1);
+    expect(shrunk.listening('gesturestart')).toBe(1);
+    shrunk.show(1200);
+    zoom.refresh();
+    expect(shrunk.listening('wheel')).toBe(0);
+    shrunk.show(400);
+    zoom.refresh();
+    expect(shrunk.listening('wheel')).toBe(1);
+    zoom.destroy();
+    expect(shrunk.listening('wheel')).toBe(0);
+    expect(shrunk.listening('pointerdown')).toBe(0);
   });
 });

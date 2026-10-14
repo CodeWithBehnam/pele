@@ -24,4 +24,5 @@ A report is in scope if a diagram can make Pele's output run script, load a reso
 - Treat an `internal-link` label, in `links` and in `data-href`, as the name of a note. Do not open it as a URL.
 - Do not fill `options` or `options.config` from the diagram. They are trusted.
 - Images load when the diagram is displayed. Pass `imageSchemes: []` to allow only relative image URLs, or block image requests with a content security policy.
+- `mount()` sets each SVG as the container's HTML. To pass it through your own sanitizer first, give `mount()` a `sanitize` function.
 - `render()` has no time limit. If you raise the limits for untrusted source, render in a worker that can be terminated.
