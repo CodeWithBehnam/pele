@@ -14,6 +14,9 @@ export interface MountOptions extends RenderOptions {
   // Turns the drawing's markup into what the element is given, such as a host's HTML sanitizer.
   // Without it the markup is set as the element's HTML.
   sanitize?: (svg: string) => Node;
+  // Called when a drawing that no call is waiting for fails: one put off while the element was
+  // hidden, or one that a change of width or fonts called for. What was shown stays.
+  onError?: (error: unknown) => void;
 }
 
 export interface Mounted {
@@ -25,7 +28,7 @@ export interface Mounted {
   // is shown. If `onRender` throws, the new drawing is already in place and stays.
   update(text: string, options?: MountOptions): void;
   // Draws again if what the drawing depends on has changed since it was drawn: the element's
-  // width, its fonts, or a font that was still loading. An element that is hidden or out of the
+  // width, its fonts, or a font that has loaded since. An element that is hidden or out of the
   // document is left until it is shown. For after a change of theme or font, and after the
   // element is put back in a document or moved to another window.
   refresh(): void;
@@ -52,6 +55,21 @@ function fontsFor(style: CSSStyleDeclaration, drawing: HTMLElement | null): Font
     family: own.getPropertyValue('--pele-font').trim() || style.fontFamily || undefined,
     mono: own.getPropertyValue('--pele-font-mono').trim() || undefined,
   };
+}
+
+// Fonts that have finished loading, counted for every document a diagram was mounted in. Widths
+// measured before are those of a fallback, so they are forgotten, and a diagram drawn before is
+// drawn anew when it is next refreshed or shown. The listener holds no diagram.
+let fontLoads = 0;
+const counted = new WeakSet<FontFaceSet>();
+
+function countFontLoads(fonts: FontFaceSet | undefined): void {
+  if (!fonts?.addEventListener || counted.has(fonts)) return;
+  counted.add(fonts);
+  fonts.addEventListener('loadingdone', () => {
+    fontLoads++;
+    forgetTextWidths();
+  });
 }
 
 // Fonts that are still loading, as one promise for each set however many diagrams wait on it.
@@ -97,11 +115,12 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
   // document, with neither fonts nor a width to read, or text or fonts came while it was hidden.
   // It is drawn anew when it is next shown.
   let stale = false;
+  let loadsSeen = fontLoads;
   let waiting = false;
   let destroyed = false;
 
   const fit = (style: CSSStyleDeclaration, fresh: boolean): RenderResult => {
-    const { onRender, sanitize, ...rest } = settings;
+    const { onRender, onError, sanitize, ...rest } = settings;
     const base: RenderOptions = {
       ...rest,
       fontFamily: rest.fontFamily ?? fonts.family,
@@ -148,6 +167,7 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
     if (fresh) {
       fonts = fontsFor(style, drawing);
       stale = element.isConnected === false;
+      loadsSeen = fontLoads;
     }
     let next = fit(style, fresh);
     if (quiet && next.svg === shown.svg) return;
@@ -201,17 +221,18 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
     const style = windowOf(element).getComputedStyle(element);
     const now = fontsFor(style, (element.firstElementChild as HTMLElement | null) ?? null);
     try {
-      if (stale || now.family !== fonts.family || now.mono !== fonts.mono) {
+      if (stale || loadsSeen !== fontLoads || now.family !== fonts.family || now.mono !== fonts.mono) {
         draw(true, true);
       } else if (adapts !== false && settings.maxWidth === undefined) {
         const available = room(element, style);
         // An element that wraps the drawing follows its width, which is not a change of room.
         if (available !== drawnFor && available !== shown.width) draw(false);
       }
-    } catch {
-      // The text drew before. Whatever stops it now, what is shown stays, and is not tried again
-      // until something else changes.
+    } catch (error) {
+      // What is shown stays, and is not drawn again until something else changes.
       stale = false;
+      loadsSeen = fontLoads;
+      settings.onError?.(error);
     }
     zoomer?.resized();
     awaitFonts();
@@ -228,6 +249,8 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
     view = next;
     observer = next.ResizeObserver ? new next.ResizeObserver(refresh) : undefined;
     observer?.observe(element);
+    countFontLoads(element.ownerDocument?.fonts);
+    countFontLoads((globalThis as { document?: Document }).document?.fonts);
   };
   watch();
 

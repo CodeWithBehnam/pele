@@ -55,15 +55,24 @@ const spying = (seen: (o: RenderOptions) => void, parsed?: () => void): Engine =
 // A document's fonts as mount() reads them: whether any are loading, and a promise for when none are.
 const fontSet = () => {
   let finish = (): void => {};
-  const fonts = { status: 'loaded', ready: Promise.resolve() as Promise<unknown> };
+  const listeners = new Set<() => void>();
+  const fonts = {
+    status: 'loaded',
+    ready: Promise.resolve() as Promise<unknown>,
+    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+  };
+  // A font that loads without having been seen loading, as one a page loads with the FontFace API.
+  const done = (): void => listeners.forEach((listener) => listener());
   return {
     fonts,
+    done,
     loading(): void {
       fonts.status = 'loading';
       fonts.ready = new Promise((resolve) => {
         finish = () => {
           fonts.status = 'loaded';
           resolve(fonts);
+          done();
         };
       });
     },
@@ -225,15 +234,21 @@ describe('mount', () => {
     await fonts.loaded();
     expect(seen.length).toBeGreaterThan(drawn);
     expect(renders).toBe(1);
-    // Fonts that load after it was drawn while none were loading leave it alone. It was not
-    // measured with them.
-    const after = seen.length;
+    // Fonts that load after it was drawn while none were loading leave it alone until it is next
+    // refreshed, which draws it anew once.
+    let after = seen.length;
     fonts.loading();
     await fonts.loaded();
     expect(seen.length).toBe(after);
-    // Nor does a diagram that was stopped wait for them.
+    handle.refresh();
+    expect(seen.length).toBeGreaterThan(after);
+    after = seen.length;
+    handle.refresh();
+    expect(seen.length).toBe(after);
+    // A diagram that was stopped does not wait for fonts.
     fonts.loading();
     handle.refresh();
+    after = seen.length;
     handle.destroy();
     await fonts.loaded();
     expect(seen.length).toBe(after);
@@ -497,6 +512,44 @@ describe('mount', () => {
     expect([...new Set(seen)]).toEqual(['Inter']);
     expect(handle.result.type).toBe('flowchart');
     expect(el.innerHTML).toBe(handle.result.svg);
+  });
+
+  it('draws a hidden diagram anew when it is shown after a font has loaded', () => {
+    const doc = page();
+    const el = doc.element(500);
+    const seen: string[] = [];
+    mountWith(spying((o) => seen.push(o.fontFamily ?? '')), el, FLOW);
+    resize(el, 0);
+    doc.fonts.done();
+    seen.length = 0;
+    resize(el, 0);
+    expect(seen).toEqual([]);
+    resize(el, 500);
+    expect(seen.length).toBeGreaterThan(0);
+    // Once.
+    seen.length = 0;
+    resize(el, 500);
+    expect(seen).toEqual([]);
+  });
+
+  it('reports a drawing that was put off and then fails, and keeps what was shown', () => {
+    const el = element(500);
+    const errors: unknown[] = [];
+    const handle = mount(el, SANKEY, { ...options, onError: (error) => errors.push(error) });
+    const before = el.innerHTML;
+    resize(el, 0);
+    // It parses, but a Sankey diagram cannot be drawn with a loop in it.
+    const circular = 'sankey\n\nA,B,10\nB,A,10\n';
+    expect(() => render(circular, options)).toThrow();
+    handle.update(circular);
+    expect(errors).toEqual([]);
+    resize(el, 500);
+    expect(errors.length).toBe(1);
+    expect(el.innerHTML).toBe(before);
+    expect(handle.result.type).toBe('sankey');
+    // Not tried again until something changes.
+    resize(el, 500);
+    expect(errors.length).toBe(1);
   });
 
   it('puts in the element what a host makes of the markup', () => {
