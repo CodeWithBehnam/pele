@@ -43,6 +43,7 @@
       "import": "./dist/esm/diagrams/*.js",
       "default": "./dist/esm/diagrams/*.js"
     },
+    "./global": "./dist/pele.global.js",
     "./package.json": "./package.json"
   },
   "files": [

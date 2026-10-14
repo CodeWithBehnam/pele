@@ -142,8 +142,8 @@ export class SeqDb implements SequenceModel {
       }
       if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) doc = parsed;
     }
-    const docType = doc && Object.hasOwn(doc, 'type') ? doc.type : undefined;
-    const docAlias = doc && Object.hasOwn(doc, 'alias') ? doc.alias : undefined;
+    const docType = doc && Object.prototype.hasOwnProperty.call(doc, 'type') ? doc.type : undefined;
+    const docAlias = doc && Object.prototype.hasOwnProperty.call(doc, 'alias') ? doc.alias : undefined;
     if (docType !== undefined && docType !== null) type = String(docType);
     if (docAlias && (!description || description.text === name)) {
       description = { text: String(docAlias), wrap: description?.wrap, type };

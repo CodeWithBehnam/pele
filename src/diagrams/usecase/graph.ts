@@ -117,7 +117,7 @@ export function flattenJsonRows(json: Pick<UsecaseJsonNode, 'value' | 'propertyO
       if (keys.length === 0) rows.push({ key: path, accessibleKey: path, value: '{}' });
       for (const key of keys) {
         children.push([
-          Object.hasOwn(object, key) ? object[key] : undefined,
+          Object.prototype.hasOwnProperty.call(object, key) ? object[key] : undefined,
           path ? `${path}.${key}` : key,
           `${pointer}/${key.replaceAll('~', '~0').replaceAll('/', '~1')}`,
         ]);

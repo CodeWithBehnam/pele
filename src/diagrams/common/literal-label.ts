@@ -59,7 +59,7 @@ export function breakLabel(label: Label, measurer: TextMeasurer, room: number): 
         continue;
       }
       for (const char of Array.from(span.text)) {
-        let last = current.at(-1);
+        let last: Label['lines'][number][number] | undefined = current[current.length - 1];
         const joined = last && last.icon === undefined && last.style === span.style;
         const nextWidth = measurer.width(joined ? last!.text + char : char, label.size, span.style);
         let added = nextWidth - (joined ? last!.width : 0);

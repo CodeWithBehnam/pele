@@ -21,7 +21,7 @@ export interface IconConfig {
 }
 
 function own(map: IconMap | undefined, key: string): string | undefined {
-  if (map === undefined || !Object.hasOwn(map, key)) return undefined;
+  if (map === undefined || !Object.prototype.hasOwnProperty.call(map, key)) return undefined;
   const value = map[key];
   return typeof value === 'string' ? value : undefined;
 }

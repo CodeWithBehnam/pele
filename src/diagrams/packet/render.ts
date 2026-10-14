@@ -37,7 +37,8 @@ function draw(model: PacketModel, config: Config, options: RenderOptions, down: 
     // A byte is the shortest row. Below that every label is one character to a line, and a long
     // packet is a row to a bit.
     bitsPerRow = Math.min(bitsPerRow, Math.max(8, 2 ** Math.floor(Math.log2(count))));
-    const last = model.rows.at(-1)?.at(-1)?.end ?? 0;
+    const lastRow = model.rows[model.rows.length - 1];
+    const last = lastRow?.[lastRow.length - 1]?.end ?? 0;
     if (Math.ceil((last + 1) / bitsPerRow) > 10000) bitsPerRow = model.bitsPerRow;
     bitWidth = Math.min(bitWidth, Math.max(18, ((options.maxWidth ?? 320) - 2 * pad) / bitsPerRow));
     // The model has split each field at its own rows. Its pieces are joined again first, so that
@@ -45,7 +46,7 @@ function draw(model: PacketModel, config: Config, options: RenderOptions, down: 
     const piece = (block: PacketBlock): boolean => block.bits === block.end - block.start;
     const whole: PacketBlock[] = [];
     for (const row of model.rows) for (const block of row) {
-      const prev = whole.at(-1);
+      const prev = whole[whole.length - 1];
       if (prev && piece(prev) && piece(block) && prev.label === block.label && block.start === prev.end + 1 && block.start % model.bitsPerRow === 0) {
         prev.end = block.end;
         prev.bits = prev.end - prev.start;

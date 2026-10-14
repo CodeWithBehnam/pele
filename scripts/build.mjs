@@ -2,6 +2,7 @@ import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
+import { browserBuild } from './browser-build.mjs';
 
 rmSync('dist', { recursive: true, force: true });
 
@@ -17,6 +18,9 @@ const shared = {
 
 // One file with every diagram type.
 await build({ ...shared, entryPoints: ['src/index.ts'], outfile: 'dist/pele.js' });
+
+// The same, as a script for a <script> tag.
+await build({ ...browserBuild, outfile: 'dist/pele.global.js' });
 
 // The same code in pieces: a core, one entry per diagram type, and a loader that fetches a type
 // when it is first needed. Code that several of them use goes into shared chunks.
@@ -66,6 +70,7 @@ function closure(entry) {
 }
 
 console.log(`dist/pele.js  ${sizes(['dist/pele.js'])}`);
+console.log(`dist/pele.global.js  ${sizes(['dist/pele.global.js'])}`);
 console.log(`dist/esm/core.js with its chunks  ${sizes(closure('dist/esm/core.js'))}`);
 console.log(`dist/esm/lazy.js with its chunks  ${sizes(closure('dist/esm/lazy.js'))}`);
 if (process.argv.includes('--sizes')) {
