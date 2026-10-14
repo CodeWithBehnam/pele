@@ -110,7 +110,8 @@ function measure(root: RailroadNode, m: Metrics, room = Infinity): Box {
   for (let i = 0; room !== Infinity && i < pending.length; i++) {
     const [node, width] = pending[i];
     budgets.set(node, width);
-    const around = node.type === 'choice' || node.type === 'optional' ? 4 * m.arc : node.type === 'repetition' ? (node.min === 0 ? 6 : 2) * m.arc : 0;
+    // A sequence that folds puts its rows inside rails, so its parts are sized for those rows.
+    const around = node.type === 'choice' || node.type === 'optional' ? 4 * m.arc : node.type === 'repetition' ? (node.min === 0 ? 6 : 2) * m.arc : node.type === 'sequence' ? 6 * m.arc : 0;
     for (const child of parts(node)) pending.push([child, Math.max(40, width - around)]);
   }
   return fold<RailroadNode, Box>(root, parts, (node, kids) => {

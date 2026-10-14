@@ -4,7 +4,7 @@ import { marker, markerTrim } from '../../svg/edges.js';
 import { svgDocument } from '../../svg/root.js';
 import { FONT_MONO, RADIUS, seriesColor } from '../../svg/theme.js';
 import { decodeEntities } from '../../text/entities.js';
-import { literalLabel } from '../common/literal-label.js';
+import { breakLabel, leftLabelSvg, literalLabel } from '../common/literal-label.js';
 import { layoutLabel, type Label } from '../../text/label.js';
 import { Style, defaultMeasurer } from '../../text/measurer.js';
 import type { RenderOptions, Rendered } from '../../types.js';
@@ -247,6 +247,11 @@ function draw(model: EventModelingModel, _config: Config, options: RenderOptions
   };
 }
 
+const RAIL_GAP = 8;
+// What a card keeps when rails take the room, and what a heading leaves for an arrow beside it.
+const CARD_MIN = 120;
+const ARROW_ROOM = 20;
+
 function verticalEventModel(model: EventModelingModel, options: RenderOptions): Rendered {
   const size = options.fontSize ?? 16;
   const small = Math.round(size * 0.875);
@@ -254,17 +259,46 @@ function verticalEventModel(model: EventModelingModel, options: RenderOptions): 
   const pad = options.padding ?? 8;
   const measurer = options.measurer ?? defaultMeasurer(options.fontFamily, options.fontFamilyMono);
   const room = Math.max(160, (options.maxWidth ?? 320) - 2 * pad);
-  const gutter = 24;
-  const cardWidth = room - gutter;
+  // A relation that skips a card runs down a rail beside the cards. Relations into one card
+  // share a rail; others whose runs overlap take the next rail out, so that no two follow the
+  // same line.
+  const order = new Map(model.boxes.map((box, index) => [box, index]));
+  const runs = new Map<EmBox, [number, number]>();
+  // A relation between neighbouring cards passes the lower card's lane heading.
+  const passed = new Set<EmBox>();
+  for (const relation of model.relations) {
+    const s = order.get(relation.source), t = order.get(relation.target);
+    if (s === undefined || t === undefined || s === t) continue;
+    if (Math.abs(s - t) < 2) {
+      passed.add(model.boxes[Math.max(s, t)]);
+      continue;
+    }
+    const run = runs.get(relation.target);
+    if (run) { run[0] = Math.min(run[0], s); run[1] = Math.max(run[1], s); }
+    else runs.set(relation.target, [Math.min(s, t), Math.max(s, t)]);
+  }
+  const railOf = new Map<EmBox, number>();
+  const railEnds: number[] = [];
+  for (const [target, [from, to]] of [...runs].sort((a, b) => a[1][0] - b[1][0])) {
+    let rail = railEnds.findIndex(end => end < from);
+    if (rail < 0) rail = railEnds.length;
+    railEnds[rail] = to;
+    railOf.set(target, rail);
+  }
+  const gutter = 24 + RAIL_GAP * Math.max(0, railEnds.length - 1);
+  // Rails are never shared to save room: past what the width allows, the drawing is wider.
+  const cardWidth = Math.max(CARD_MIN, room - gutter);
   const textRoom = cardWidth - 2 * BOX_PAD_X;
   const title = layoutLabel(model.title, false, measurer, size, room, Style.Bold);
   let y = pad + (title.height ? title.height + 12 : 0);
-  let width = Math.max(title.width, room);
+  let bottom = pad + title.height;
+  let width = Math.max(title.width, cardWidth + gutter);
   let nodes = '', edges = '', cards = '';
-  const placed = new Map<EmBox, { y: number; h: number; w: number; index: number }>();
+  const placed = new Map<EmBox, { y: number; h: number; w: number; index: number; lane: number }>();
   const text = (raw: string, fontSize: number, style = 0): Label => literalLabel(decodeEntities(raw), measurer, fontSize, textRoom, style);
   model.boxes.forEach((box, index) => {
-    const lane = layoutLabel(box.lane.label, false, measurer, small, textRoom, Style.Bold);
+    const laneRoom = passed.has(box) ? textRoom - ARROW_ROOM : textRoom;
+    const lane = breakLabel(layoutLabel(box.lane.label, false, measurer, small, laneRoom, Style.Bold), measurer, laneRoom);
     const name = layoutLabel(box.name, false, measurer, small, textRoom - 36, Style.Bold);
     const data = box.data ? text(box.data, mono, Style.Mono) : undefined;
     const w = Math.max(cardWidth, lane.width + 2 * BOX_PAD_X, name.width + 2 * BOX_PAD_X + 36, (data?.width ?? 0) + 2 * BOX_PAD_X);
@@ -273,16 +307,17 @@ function verticalEventModel(model: EventModelingModel, options: RenderOptions): 
     const series = SERIES.get(box.kind);
     const cy = y + headH;
     const frame = `x="${num(pad)}" y="${num(cy)}" width="${num(w)}" height="${num(h)}" rx="${RADIUS}"`;
-    nodes += `<g class="pele-cluster pele-em-lane" data-id="${escText(box.lane.label)}"><rect x="${num(pad)}" y="${num(y - 2)}" width="${num(w)}" height="${num(lane.height + 4)}" fill="var(--_bg)"/>` +
-      labelSvg(lane, pad + BOX_PAD_X + lane.width / 2, y + lane.height / 2, ` class="pele-cluster-label" font-size="${small}" font-weight="var(--_hw)" fill="var(--_m)"`) +
+    nodes += `<g class="pele-cluster pele-em-lane" data-id="${escText(box.lane.label)}">` +
+      leftLabelSvg(lane, pad + BOX_PAD_X, y, ` class="pele-cluster-label" font-size="${small}" font-weight="var(--_hw)" fill="var(--_m)"`) +
       `<g class="pele-node pele-em-${box.kind}${box.reset ? ' pele-em-reset' : ''}" data-id="${escText(box.id)}"><rect ${frame} fill="var(--_bg)" stroke="var(--_b)"/>` +
       (series === undefined ? '' : `<rect ${frame} fill="${seriesColor(series)}" fill-opacity="0.22" stroke="${seriesColor(series)}"/>`) +
       labelSvg(name, pad + BOX_PAD_X + name.width / 2, cy + BOX_PAD_Y + name.height / 2, ` class="pele-label" font-size="${small}" font-weight="var(--_hw)"`) +
       `<text class="pele-em-frame" x="${num(pad + w - BOX_PAD_X)}" y="${num(cy + BOX_PAD_Y + small)}" text-anchor="end" font-size="${mono}" fill="var(--_m)">${esc(box.id)}</text>` +
       (data ? lines(data.lines.map(line => line.map(span => span.text).join('')), pad + BOX_PAD_X, cy + BOX_PAD_Y + name.height + 6 + data.lineHeight / 2 + mono * 0.35, data.lineHeight, ` class="pele-em-data" font-family="${FONT_MONO}" font-size="${mono}"`) : '') + '</g></g>';
-    placed.set(box, { y: cy, h, w, index });
+    placed.set(box, { y: cy, h, w, index, lane: lane.width });
     width = Math.max(width, w + gutter);
-    y = cy + h + 28;
+    bottom = cy + h;
+    y = bottom + 28;
   });
   for (const relation of model.relations) {
     const s = placed.get(relation.source), t = placed.get(relation.target);
@@ -293,12 +328,14 @@ function verticalEventModel(model: EventModelingModel, options: RenderOptions): 
     const ty = down ? t.y : t.y + t.h;
     let d: string, head: string;
     if (Math.abs(s.index - t.index) === 1) {
-      const cx = pad + Math.min(s.w, t.w) / 2;
+      // The lower card's lane heading sits in the gap, and wraps to leave the arrow room beside it.
+      const cx = pad + Math.max(Math.min(s.w, t.w) / 2, BOX_PAD_X + (down ? t : s).lane + 16);
       d = `M${num(cx)},${num(sy)}V${num(ty - dir * markerTrim('arrow_point'))}`;
       head = marker('arrow_point', cx, ty, 0, dir, 'var(--_l)');
     } else {
-      const rail = pad + width - gutter / 2;
-      const from = s.y + s.h / 2, to = t.y + t.h / 2;
+      const rail = pad + width - gutter + 12 + RAIL_GAP * (railOf.get(relation.target) ?? 0);
+      // A card can send one relation and receive another: they leave above and arrive below its middle.
+      const from = s.y + s.h / 2 - 5, to = t.y + t.h / 2 + 5;
       d = `M${num(pad + s.w)},${num(from)}H${num(rail)}V${num(to)}H${num(pad + t.w + markerTrim('arrow_point'))}`;
       head = marker('arrow_point', pad + t.w, to, -1, 0, 'var(--_l)');
     }
@@ -313,7 +350,8 @@ function verticalEventModel(model: EventModelingModel, options: RenderOptions): 
     cards += `<g class="pele-em-${kind}" data-id="${escText(frame)}"><rect x="${num(pad)}" y="${num(y)}" width="${num(w)}" height="${num(h)}" rx="${RADIUS}" fill="var(--_bg)" stroke="var(--_b)"/>` +
       labelSvg(head, pad + BOX_PAD_X + head.width / 2, y + BOX_PAD_Y + head.height / 2, ` font-size="${small}" font-weight="var(--_hw)"`) +
       lines(body.lines.map(line => line.map(span => span.text).join('')), pad + BOX_PAD_X, y + BOX_PAD_Y + head.height + body.lineHeight / 2 + small * 0.35, body.lineHeight, ` font-size="${small}"`) + '</g>';
-    y += h + CARD_GAP;
+    bottom = y + h;
+    y = bottom + CARD_GAP;
     width = Math.max(width, w);
   };
   for (const note of model.notes) card('note', 'Note', note.frame, note.text);
@@ -323,7 +361,7 @@ function verticalEventModel(model: EventModelingModel, options: RenderOptions): 
     rows.push(`Then  ${spec.then.join(', ')}`);
     card('specification', 'Given / When / Then', spec.frame, rows.join('\n'));
   }
-  const totalWidth = Math.ceil(width + 2 * pad), height = Math.ceil(y + pad);
+  const totalWidth = Math.ceil(width + 2 * pad), height = Math.ceil(bottom + pad);
   const content = labelSvg(title, totalWidth / 2, pad + title.height / 2, ' class="pele-title" font-weight="var(--_tw)"') + edges + nodes + cards;
   return { svg: svgDocument('eventmodeling', totalWidth, height, size, options, model, content), width: totalWidth, height, links: [] };
 }

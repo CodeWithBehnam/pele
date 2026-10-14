@@ -1,9 +1,12 @@
-import { labelSvg } from '../../svg/builder.js';
+import { esc, labelSvg, num, sharedStyle, spanStyle, textStyle } from '../../svg/builder.js';
 import type { Label } from '../../text/label.js';
 import type { TextMeasurer } from '../../text/measurer.js';
 
-// Literal labels, including filenames and protocol fields, must retain every character.
-// Long words can break between code points; measurement stays bounded by one line of text.
+const SPACE = /\s/;
+
+// Literal labels, including filenames and protocol fields, must retain every character but the
+// spaces a line breaks at. Long words can break between code points; measurement stays bounded
+// by one line of text.
 export function literalLabel(text: string, measurer: TextMeasurer, size: number, room: number, style = 0): Label {
   const lines: string[] = [];
   for (const raw of text.split('\n')) {
@@ -21,13 +24,16 @@ export function literalLabel(text: string, measurer: TextMeasurer, size: number,
         else hi = mid - 1;
       }
       let take = lo;
-      if (from + take < chars.length) {
+      const wraps = from + take < chars.length;
+      if (wraps && !SPACE.test(chars[from + take])) {
         for (let i = take - 1; i > 0; i--) {
-          if (/\s/.test(chars[from + i])) { take = i + 1; break; }
+          if (SPACE.test(chars[from + i])) { take = i + 1; break; }
         }
       }
-      lines.push(chars.slice(from, from + take).join(''));
+      const line = chars.slice(from, from + take).join('');
+      lines.push(wraps ? line.trimEnd() || line : line);
       from += take;
+      while (wraps && from < chars.length && SPACE.test(chars[from])) from++;
     }
   }
   if (text === '') lines.length = 0;
@@ -70,12 +76,26 @@ export function breakLabel(label: Label, measurer: TextMeasurer, room: number): 
   return { ...label, lines, widths, width, height: lines.length * label.lineHeight };
 }
 
+// Writes a label with every line starting at x. A line is anchored at its start and keeps its
+// spaces, so that where it begins does not depend on how its text was measured.
 export function leftLabelSvg(label: Label, x: number, top: number, attrs: string): string {
+  const shared = sharedStyle(label);
+  const open = '<text' + textStyle(attrs, shared);
   let body = '';
   for (let i = 0; i < label.lines.length; i++) {
-    const width = label.widths[i];
-    const line = { ...label, lines: [label.lines[i]], widths: [width], width, height: label.lineHeight };
-    body += labelSvg(line, x + width / 2, top + (i + 0.5) * label.lineHeight, attrs);
+    const spans = label.lines[i];
+    const cy = top + (i + 0.5) * label.lineHeight;
+    if (spans.some(span => span.icon !== undefined)) {
+      const width = label.widths[i];
+      body += labelSvg({ ...label, lines: [spans], widths: [width], width, height: label.lineHeight }, x + width / 2, cy, attrs);
+      continue;
+    }
+    let text = '';
+    for (const span of spans) {
+      const own = spanStyle(span.style & ~shared);
+      text += own ? `<tspan${own}>${esc(span.text)}</tspan>` : esc(span.text);
+    }
+    if (text !== '') body += `${open} x="${num(x)}" y="${num(cy + label.size * 0.35)}" text-anchor="start" xml:space="preserve">${text}</text>`;
   }
   return body;
 }

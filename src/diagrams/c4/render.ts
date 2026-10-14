@@ -6,10 +6,11 @@ import { ARROW, marker, markerTrim } from '../../svg/edges.js';
 import { svgDocument } from '../../svg/root.js';
 import { drawShape } from '../../svg/shapes.js';
 import { RADIUS, resolveStyle, type ResolvedStyle } from '../../svg/theme.js';
-import { layoutLabel, type Label } from '../../text/label.js';
+import { layoutLabel } from '../../text/label.js';
 import { Style, defaultMeasurer } from '../../text/measurer.js';
 import type { LinkInfo, RenderOptions, Rendered } from '../../types.js';
 import { linked, sanitizeUrl } from '../../util/url.js';
+import { leftLabelSvg } from '../common/literal-label.js';
 import type { C4Db } from './db.js';
 import { HEAD_LEFT, HEAD_TOP, layoutC4 } from './layout.js';
 import { HEAD, LANE, crosses, cylRy, queueRx, route, type Box } from './route.js';
@@ -35,17 +36,6 @@ function link(body: string, url: string | undefined, id: string, links: LinkInfo
   if (!url) return body;
   // Entity encoding has hidden any `#name;` in the address. Put it back, so that the check sees what a browser would.
   return linked(body, sanitizeUrl(url.includes('\u00b6\u00df') ? url.replace(/\ufb02\u00b0\u00b0?/g, '#').replace(/\u00b6\u00df/g, ';') : url), id, links, options);
-}
-
-function leftLabel(label: Label, x: number, top: number, attrs: string): string {
-  let out = '';
-  for (let i = 0; i < label.lines.length; i++) {
-    const w = label.widths[i];
-    const lh = label.lineHeight;
-    const line = { lines: [label.lines[i]], widths: [w], width: w, height: lh, size: label.size, lineHeight: lh };
-    out += labelSvg(line, x + w / 2, top + (i + 0.5) * lh, attrs);
-  }
-  return out;
 }
 
 export function renderC4(db: C4Db, _config: Config, options: RenderOptions): Rendered {
@@ -223,11 +213,11 @@ function draw(db: C4Db, _config: Config, options: RenderOptions, tight: boolean)
       const style = userStyle(boundary.bgColor, boundary.borderColor, boundary.fontColor);
       const x = group.x + group.headX;
       let y = group.y + HEAD_TOP;
-      let text = leftLabel(group.labels[0], x, y, ` class="pele-cluster-label" font-weight="var(--_hw)"${style.text}`);
+      let text = leftLabelSvg(group.labels[0], x, y, ` class="pele-cluster-label" font-weight="var(--_hw)"${style.text}`);
       y += group.labels[0].height;
-      text += leftLabel(group.labels[1], x, y, ` class="pele-c4-type" font-size="${small}" fill="var(--_m)"${style.text}`);
+      text += leftLabelSvg(group.labels[1], x, y, ` class="pele-c4-type" font-size="${small}" fill="var(--_m)"${style.text}`);
       y += group.labels[1].height;
-      text += leftLabel(group.labels[2], x, y, ` class="pele-c4-descr" font-size="${small}" fill="var(--_m)"${style.text}`);
+      text += leftLabelSvg(group.labels[2], x, y, ` class="pele-c4-descr" font-size="${small}" fill="var(--_m)"${style.text}`);
       clusters +=
         `<g class="pele-cluster pele-c4-${boundary.nodeType ? 'node' : 'boundary'}" data-id="${escText(boundary.alias)}">` +
         `<rect x="${num(group.x)}" y="${num(group.y)}" width="${num(group.w)}" height="${num(group.h)}" rx="${RADIUS}" fill="none" stroke="var(--_b)"${

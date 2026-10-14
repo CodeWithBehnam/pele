@@ -34,12 +34,25 @@ function draw(model: PacketModel, config: Config, options: RenderOptions, down: 
   let rows = model.rows;
   if (down) {
     const count = Math.max(1, Math.floor(((options.maxWidth ?? 320) - 2 * pad) / Math.min(bitWidth, 18)));
-    bitsPerRow = Math.min(bitsPerRow, 2 ** Math.floor(Math.log2(count)));
+    // A byte is the shortest row. Below that every label is one character to a line, and a long
+    // packet is a row to a bit.
+    bitsPerRow = Math.min(bitsPerRow, Math.max(8, 2 ** Math.floor(Math.log2(count))));
     const last = model.rows.at(-1)?.at(-1)?.end ?? 0;
     if (Math.ceil((last + 1) / bitsPerRow) > 10000) bitsPerRow = model.bitsPerRow;
     bitWidth = Math.min(bitWidth, Math.max(18, ((options.maxWidth ?? 320) - 2 * pad) / bitsPerRow));
-    rows = [];
+    // The model has split each field at its own rows. Its pieces are joined again first, so that
+    // a field is only split where one of the new rows ends. A piece counts one bit short.
+    const piece = (block: PacketBlock): boolean => block.bits === block.end - block.start;
+    const whole: PacketBlock[] = [];
     for (const row of model.rows) for (const block of row) {
+      const prev = whole.at(-1);
+      if (prev && piece(prev) && piece(block) && prev.label === block.label && block.start === prev.end + 1 && block.start % model.bitsPerRow === 0) {
+        prev.end = block.end;
+        prev.bits = prev.end - prev.start;
+      } else whole.push({ ...block });
+    }
+    rows = [];
+    for (const block of whole) {
       for (let start = block.start; start <= block.end;) {
         const end = Math.min(block.end, (Math.floor(start / bitsPerRow) + 1) * bitsPerRow - 1);
         const index = Math.floor(start / bitsPerRow);

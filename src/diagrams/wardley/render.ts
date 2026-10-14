@@ -367,7 +367,7 @@ function draw(model: WardleyModel, config: Config, options: RenderOptions, plotW
 
   let notes = '';
   for (const note of model.notes) {
-    notes += starting(text(note.text, small, Math.min(360, plotW * 0.6), tight ? Style.Bold : 0), projectX(note.x), projectY(note.y), ` class="pele-wardley-note" font-size="${small}" font-weight="var(--_hw)"`);
+    notes += starting(text(note.text, small, Math.min(360, plotW * 0.6), Style.Bold), projectX(note.x), projectY(note.y), ` class="pele-wardley-note" font-size="${small}" font-weight="var(--_hw)"`);
   }
 
   // Accelerators point right, deaccelerators left.

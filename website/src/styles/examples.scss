@@ -58,16 +58,6 @@
 }
 .example-medium, .example-narrow { display: none; }
 
-// Vertical lanes put their headings across the top. Keep zoom buttons below the drawing
-// when it still needs to shrink, so a button cannot hide a heading or a final step.
-.example-figure:has(.pele-swimlane):has(.pele-zoom:not([hidden])) {
-  margin-bottom: 38px;
-  --pele-zoom-top: auto;
-  --pele-zoom-bottom: -38px;
-
-  .pele-zoom { flex-direction: row !important; }
-}
-
 // The drawings are 640, 480 and 320 wide. Each gives way to the next where it would be shrunk by
 // more than a little, going by the width of the figure and not of the screen: the docs column
 // is narrow on a small desktop as well as on a phone.

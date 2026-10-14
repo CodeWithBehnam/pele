@@ -184,7 +184,7 @@ function draw(db: FlowDb, config: Config, options: RenderOptions, variant: FlowV
     ? variant.layout(cnodes, cedges, rootDir, layoutOptions, tight)
     : compoundLayout(cnodes, cedges, rootDir, layoutOptions);
 
-  const title = layoutLabel(db.title, false, measurer, size, 4000, Style.Bold);
+  const title = layoutLabel(db.title, false, measurer, size, tight ? titleRoom(options) : 4000, Style.Bold);
   const titleHeight = title.height > 0 ? title.height + 12 : 0;
   const inner = Math.max(layout.width, title.width);
   const ox = pad + (inner - layout.width) / 2;

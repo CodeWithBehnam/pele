@@ -1,8 +1,6 @@
 import type { Config } from '../../preprocess.js';
 import { escText, labelSvg, num } from '../../svg/builder.js';
 import { svgDocument } from '../../svg/root.js';
-import { literalLabel } from '../common/literal-label.js';
-import { layoutLabel } from '../../text/label.js';
 import { RADIUS, seriesColor } from '../../svg/theme.js';
 import type { Label } from '../../text/label.js';
 import { Style, defaultMeasurer } from '../../text/measurer.js';
@@ -224,7 +222,7 @@ function verticalJourney(model: JourneyModel, options: RenderOptions): Rendered 
   const measurer = options.measurer ?? defaultMeasurer(options.fontFamily);
   const pad = options.padding ?? 8;
   const room = Math.max(140, (options.maxWidth ?? 320) - 2 * pad);
-  const title = layoutLabel(model.title, false, measurer, size, room, Style.Bold);
+  const title = fitLabel(model.title, measurer, size, room, Style.Bold);
   const names = journeyActors(model.tasks).filter(name => name !== '');
   const actors = new Map(names.map((name, i) => [name, i]));
   let y = pad + (title.height ? title.height + 16 : 0);
@@ -234,15 +232,15 @@ function verticalJourney(model: JourneyModel, options: RenderOptions): Rendered 
   model.tasks.forEach((task, index) => {
     if (task.section !== section) {
       section = task.section;
-      const head = layoutLabel(section, false, measurer, size, room - 16, Style.Bold);
+      const head = fitLabel(section, measurer, size, room - 16, Style.Bold);
       if (head.height) {
         body += labelSvg(head, pad + 8 + head.width / 2, y + head.height / 2, ' class="pele-cluster-label" font-weight="var(--_hw)"');
         width = Math.max(width, head.width + 16);
         y += head.height + 8;
       }
     }
-    const label = layoutLabel(task.task, false, measurer, small, room - 72);
-    const people = task.people.filter(name => name !== '').map(name => ({ name, label: literalLabel(name, measurer, small, room - 44) }));
+    const label = fitLabel(task.task, measurer, small, room - 72);
+    const people = task.people.filter(name => name !== '').map(name => ({ name, label: fitLabel(name, measurer, small, room - 44) }));
     const textH = Math.max(label.height, 42);
     let h = 2 * PAD_Y + textH;
     for (const person of people) h += Math.max(16, person.label.height) + 4;
@@ -251,7 +249,8 @@ function verticalJourney(model: JourneyModel, options: RenderOptions): Rendered 
     body += labelSvg(label, pad + PAD_X + label.width / 2, y + PAD_Y + label.height / 2, ' class="pele-label"');
     const cx = pad + w - 28;
     body += face(cx, y + PAD_Y + FACE, task.score > 3 ? 'happy' : task.score < 3 ? 'sad' : 'neutral');
-    body += `<text class="pele-journey-score" x="${num(cx)}" y="${num(y + PAD_Y + 2 * FACE + small)}" font-size="${small}" text-anchor="middle">${task.score}</text>`;
+    // The score reads as the wide chart places it: within its scale, and absent when it is not a number.
+    if (!Number.isNaN(task.score)) body += `<text class="pele-journey-score" x="${num(cx)}" y="${num(y + PAD_Y + 2 * FACE + small)}" font-size="${small}" text-anchor="middle">${num(Math.min(5, Math.max(1, task.score)))}</text>`;
     let py = y + PAD_Y + textH + 4;
     for (const person of people) {
       const ph = Math.max(16, person.label.height);

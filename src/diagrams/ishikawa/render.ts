@@ -3,7 +3,7 @@ import { escText, labelSvg, num } from '../../svg/builder.js';
 import { ARROW, marker } from '../../svg/edges.js';
 import { svgDocument } from '../../svg/root.js';
 import { RADIUS } from '../../svg/theme.js';
-import { literalLabel } from '../common/literal-label.js';
+import { breakLabel } from '../common/literal-label.js';
 import { layoutLabel, type Label } from '../../text/label.js';
 import { Style, defaultMeasurer, type TextMeasurer } from '../../text/measurer.js';
 import type { RenderOptions, Rendered } from '../../types.js';
@@ -270,14 +270,15 @@ function verticalCauses(model: IshikawaModel, options: RenderOptions): Rendered 
   let nodes = '', edges = '';
   for (const entry of order) {
     entry.x = pad + entry.depth * indent;
-    entry.label = literalLabel(entry.node.text, measurer, entry.depth < 2 ? size : small, Math.max(60, room - entry.depth * indent - 20), entry.depth < 2 ? Style.Bold : 0);
+    const labelRoom = Math.max(60, room - entry.depth * indent - 20);
+    entry.label = breakLabel(layoutLabel(entry.node.text, false, measurer, entry.depth < 2 ? size : small, labelRoom, entry.depth < 2 ? Style.Bold : 0), measurer, labelRoom);
     entry.w = entry.label.width + 20;
     entry.h = entry.label.height + 12;
     entry.y = y;
     y += entry.h + 12;
     width = Math.max(width, entry.x - pad + entry.w);
     const framed = entry.depth < 2;
-    nodes += `<g class="pele-node ${entry.depth === 0 ? 'pele-ishikawa-effect' : entry.depth === 1 ? 'pele-ishikawa-category' : 'pele-ishikawa-cause'}">` +
+    nodes += `<g class="pele-node ${entry.depth === 0 ? 'pele-ishikawa-head' : entry.depth === 1 ? 'pele-ishikawa-category' : 'pele-ishikawa-cause'}" data-id="${escText(entry.node.text)}">` +
       (framed ? `<rect x="${num(entry.x)}" y="${num(entry.y)}" width="${num(entry.w)}" height="${num(entry.h)}" rx="${entry.depth === 0 ? 12 : 4}" fill="var(--_s)" stroke="var(--_b)"/>` : '') +
       labelSvg(entry.label, entry.x + entry.w / 2, entry.y + entry.h / 2, ` class="pele-label"${entry.depth < 2 ? ' font-weight="var(--_hw)"' : ''}${entry.depth > 1 ? ` font-size="${small}"` : ''}`) + '</g>';
     if (entry.parent >= 0) {
@@ -286,7 +287,7 @@ function verticalCauses(model: IshikawaModel, options: RenderOptions): Rendered 
       edges += `<path class="pele-edge" d="M${num(gx)},${num(parent.y + parent.h)}V${num(entry.y + entry.h / 2)}H${num(entry.x)}" fill="none" stroke="var(--_b)"/>`;
     }
   }
-  const totalWidth = Math.ceil(width + 2 * pad), height = Math.ceil(y + pad);
+  const totalWidth = Math.ceil(width + 2 * pad), height = Math.ceil(Math.max(pad + title.height, y - 12) + pad);
   const content = labelSvg(title, totalWidth / 2, pad + title.height / 2, ' class="pele-title" font-weight="var(--_tw)"') + edges + nodes;
   return { svg: svgDocument('ishikawa', totalWidth, height, size, options, {}, content), width: totalWidth, height, links: [] };
 }
