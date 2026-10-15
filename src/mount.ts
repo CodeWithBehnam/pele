@@ -28,9 +28,9 @@ export interface Mounted {
   // is shown. If `onRender` throws, the new drawing is already in place and stays.
   update(text: string, options?: MountOptions): void;
   // Draws again if what the drawing depends on has changed since it was drawn: the element's
-  // width, its fonts, or a font that has loaded since. An element that is hidden or out of the
-  // document is left until it is shown. For after a change of theme or font, and after the
-  // element is put back in a document or moved to another window.
+  // width or its fonts. An element that is hidden or out of the document is left until it is
+  // shown. For after a change of theme or font, and after the element is put back in a document
+  // or moved to another window.
   refresh(): void;
   // Stops watching the element. What it shows stays.
   destroy(): void;
@@ -57,30 +57,11 @@ function fontsFor(style: CSSStyleDeclaration, drawing: HTMLElement | null): Font
   };
 }
 
-// Fonts that have finished loading, counted for each document a diagram was mounted in. Widths
-// measured before are those of a fallback, so they are forgotten, and a diagram drawn before is
-// drawn anew when it is next refreshed or shown. The listener holds no diagram.
-const fontLoads = new WeakMap<FontFaceSet, number>();
-
-function countFontLoads(fonts: FontFaceSet | undefined): void {
-  if (!fonts?.addEventListener || fontLoads.has(fonts)) return;
-  fontLoads.set(fonts, 0);
-  fonts.addEventListener('loadingdone', () => {
-    fontLoads.set(fonts, (fontLoads.get(fonts) ?? 0) + 1);
-    forgetTextWidths();
-  });
-}
-
 // The fonts a diagram is drawn with: those of the element's document, which its CSS names, and
 // those of the script's, which measures with its canvas.
 function fontSets(element: HTMLElement): FontFaceSet[] {
   const sets = new Set([element.ownerDocument?.fonts, (globalThis as { document?: Document }).document?.fonts]);
   return [...sets].filter((fonts): fonts is FontFaceSet => fonts !== undefined);
-}
-
-// How many of the diagram's fonts have loaded. A font that loads in another window leaves it alone.
-function loadsFor(element: HTMLElement): number {
-  return fontSets(element).reduce((sum, fonts) => sum + (fontLoads.get(fonts) ?? 0), 0);
 }
 
 // Fonts that are still loading, as one promise for each set however many diagrams wait on it.
@@ -131,7 +112,6 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
   // document, with neither fonts nor a width to read, or text or fonts came while it was hidden.
   // It is drawn anew when it is next shown.
   let stale = false;
-  let loadsSeen = 0;
   let waiting = false;
   let destroyed = false;
 
@@ -183,7 +163,6 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
     if (fresh) {
       fonts = fontsFor(style, drawing);
       stale = element.isConnected === false;
-      loadsSeen = loadsFor(element);
     }
     let next = fit(style, fresh);
     if (quiet && next.svg === shown.svg) return;
@@ -236,7 +215,7 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
     const style = windowOf(element).getComputedStyle(element);
     const now = fontsFor(style, (element.firstElementChild as HTMLElement | null) ?? null);
     try {
-      if (stale || loadsSeen !== loadsFor(element) || now.family !== fonts.family || now.mono !== fonts.mono) {
+      if (stale || now.family !== fonts.family || now.mono !== fonts.mono) {
         draw(true, true);
       } else if (adapts !== false && settings.maxWidth === undefined) {
         const available = room(element, style);
@@ -246,7 +225,6 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
     } catch (error) {
       // What is shown stays, and is not drawn again until something else changes.
       stale = false;
-      loadsSeen = loadsFor(element);
       settings.onError?.(error);
     }
     zoomer?.resized();
@@ -264,8 +242,6 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
     view = next;
     observer = next.ResizeObserver ? new next.ResizeObserver(refresh) : undefined;
     observer?.observe(element);
-    countFontLoads(element.ownerDocument?.fonts);
-    countFontLoads((globalThis as { document?: Document }).document?.fonts);
   };
 
   const handle: Mounted = {
@@ -284,7 +260,7 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
         nextOptions.maxEdges !== settings.maxEdges ||
         nextOptions.config !== settings.config;
       const nextModel = reparse ? engine.parse(next, nextOptions) : model;
-      const before = { source, settings, model, natural, fonts, adapts, drawnFor, stale, loadsSeen };
+      const before = { source, settings, model, natural, fonts, adapts, drawnFor, stale };
       const was = shown;
       source = next;
       settings = nextOptions;
@@ -299,7 +275,7 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
       } catch (error) {
         // Text that could not be drawn left the element alone. If the element has the new
         // drawing, it was the host's onRender that threw, and the update stands.
-        if (shown === was) ({ source, settings, model, natural, fonts, adapts, drawnFor, stale, loadsSeen } = before);
+        if (shown === was) ({ source, settings, model, natural, fonts, adapts, drawnFor, stale } = before);
         else zoom();
         throw error;
       }

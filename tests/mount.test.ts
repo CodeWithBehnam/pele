@@ -55,24 +55,18 @@ const spying = (seen: (o: RenderOptions) => void, parsed?: () => void): Engine =
 // A document's fonts as mount() reads them: whether any are loading, and a promise for when none are.
 const fontSet = () => {
   let finish = (): void => {};
-  const listeners = new Set<() => void>();
   const fonts = {
     status: 'loaded',
     ready: Promise.resolve() as Promise<unknown>,
-    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
   };
-  // A font that loads without having been seen loading, as one a page loads with the FontFace API.
-  const done = (): void => listeners.forEach((listener) => listener());
   return {
     fonts,
-    done,
     loading(): void {
       fonts.status = 'loading';
       fonts.ready = new Promise((resolve) => {
         finish = () => {
           fonts.status = 'loaded';
           resolve(fonts);
-          done();
         };
       });
     },
@@ -234,15 +228,10 @@ describe('mount', () => {
     await fonts.loaded();
     expect(seen.length).toBeGreaterThan(drawn);
     expect(renders).toBe(1);
-    // Fonts that load after it was drawn while none were loading leave it alone until it is next
-    // refreshed, which draws it anew once.
+    // Fonts that load after it was drawn while none were loading leave it alone.
     let after = seen.length;
     fonts.loading();
     await fonts.loaded();
-    expect(seen.length).toBe(after);
-    handle.refresh();
-    expect(seen.length).toBeGreaterThan(after);
-    after = seen.length;
     handle.refresh();
     expect(seen.length).toBe(after);
     // A diagram that was stopped does not wait for fonts.
@@ -372,33 +361,6 @@ describe('mount', () => {
     await settle();
     expect(dropped.filter((ref) => ref.deref() !== undefined).length).toBe(0);
     await doc.fonts.loaded();
-  });
-
-  it('measures again after a font loaded, though text that could not be drawn came between', () => {
-    const doc = page();
-    const el = doc.element(500);
-    let draws = 0;
-    const handle = mountWith(spying(() => draws++), el, SANKEY);
-    doc.fonts.done();
-    expect(() => handle.update('sankey\n\nA,B,10\nB,A,10\n')).toThrow();
-    draws = 0;
-    handle.refresh();
-    expect(draws).toBeGreaterThan(0);
-  });
-
-  it('leaves a diagram alone when a font loads in another window', () => {
-    const here = page();
-    const there = page();
-    let draws = 0;
-    const handle = mountWith(spying(() => draws++), here.element(500), FLOW);
-    mountWith(spying(() => {}), there.element(500), FLOW);
-    there.fonts.done();
-    draws = 0;
-    handle.refresh();
-    expect(draws).toBe(0);
-    here.fonts.done();
-    handle.refresh();
-    expect(draws).toBeGreaterThan(0);
   });
 
   it('leaves a diagram that is out of the document alone when a font loads, and draws it when it is back', async () => {
@@ -546,14 +508,15 @@ describe('mount', () => {
     expect(el.innerHTML).toBe(handle.result.svg);
   });
 
-  it('draws a hidden diagram anew when it is shown after a font has loaded', () => {
+  it('draws a hidden diagram anew when it is shown after the fonts it was drawn with have loaded', async () => {
     const doc = page();
     const el = doc.element(500);
     const seen: string[] = [];
+    doc.fonts.loading();
     mountWith(spying((o) => seen.push(o.fontFamily ?? '')), el, FLOW);
     resize(el, 0);
-    doc.fonts.done();
     seen.length = 0;
+    await doc.fonts.loaded();
     resize(el, 0);
     expect(seen).toEqual([]);
     resize(el, 500);
