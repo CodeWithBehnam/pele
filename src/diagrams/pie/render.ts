@@ -105,6 +105,11 @@ function draw(model: PieModel, config: Config, options: RenderOptions, radius: n
   let labels = '';
   let outside = '';
   let angle = 0;
+  // Labels outside the rim, each moved on along it until it clears those placed before.
+  const rim = radius + OUTSIDE / 2;
+  const placedOutside: { x: number; y: number; width: number }[] = [];
+  const clear = (x: number, y: number, width: number): boolean =>
+    placedOutside.every((other) => Math.abs(x - other.x) >= (width + other.width) / 2 + 2 || Math.abs(y - other.y) >= small + 2);
   entries.forEach(([label], index) => {
     const share = shares[index];
     if (share === 0) return;
@@ -113,8 +118,13 @@ function draw(model: PieModel, config: Config, options: RenderOptions, radius: n
     const mid = (angle + end) / 2;
     const text = (share * 100).toFixed(0) + '%';
     if (narrow[index]) {
-      const r = radius + OUTSIDE / 2;
-      outside += `<text x="${num(Math.sin(mid) * r)}" y="${num(-Math.cos(mid) * r + small * 0.35)}">${text}</text>`;
+      const width = measurer.width(text, small, 0);
+      let at = mid;
+      for (let step = 0; step < 360 && !clear(Math.sin(at) * rim, -Math.cos(at) * rim, width); step++) at += 2 / rim;
+      const x = Math.sin(at) * rim;
+      const y = -Math.cos(at) * rim;
+      placedOutside.push({ x, y, width });
+      outside += `<text x="${num(x)}" y="${num(y + small * 0.35)}">${text}</text>`;
     } else {
       const r = radius * textPosition;
       labels += `<text x="${num(Math.sin(mid) * r)}" y="${num(-Math.cos(mid) * r + small * 0.35)}">${text}</text>`;
@@ -154,7 +164,7 @@ function draw(model: PieModel, config: Config, options: RenderOptions, radius: n
   const totalHeight = Math.ceil(height + titleHeight + 2 * pad);
   const content =
     labelSvg(title, totalWidth / 2, pad + title.height / 2, ' class="pele-title" font-weight="var(--_tw)"') +
-    `<g class="pele-slices" transform="translate(${num(cx)},${num(cy)})" stroke="var(--_bg)" stroke-width="1.5" stroke-linejoin="round">${slices}</g>` +
+    `<g class="pele-slices" transform="translate(${num(cx)},${num(cy)})" stroke="var(--_bg)" stroke-width="1" stroke-linejoin="round">${slices}</g>` +
     (labels
       ? `<g class="pele-slice-labels" transform="translate(${num(cx)},${num(cy)})" font-size="${small}" text-anchor="middle" fill="var(--_bg)">${labels}</g>`
       : '') +

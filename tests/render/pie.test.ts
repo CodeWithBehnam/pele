@@ -52,6 +52,22 @@ describe('pie rendering', () => {
     expect(below.width).toBeLessThan(plain.width);
   });
 
+  it('moves the labels of thin slices outside the rim apart', () => {
+    const { svg } = render('pie\n "Calcium" : 2\n "Potassium" : 2.4\n "Magnesium" : 46\n "Test" : 50', options);
+    const outside = [...svg.matchAll(/<g class="pele-slice-labels"[^>]*font-size="(\d+)" text-anchor="middle">(.*?)<\/g>/g)].find((m) => !m[0].includes('fill='));
+    expect(outside).toBeDefined();
+    const size = Number(outside![1]);
+    const boxes = [...outside![2].matchAll(/<text x="([-\d.]+)" y="([-\d.]+)">([^<]*)<\/text>/g)].map(([, x, y, text]) => ({
+      x: Number(x),
+      y: Number(y),
+      w: metricsMeasurer.width(text, size, 0),
+    }));
+    expect(boxes.length).toBe(2);
+    const [a, b] = boxes;
+    const apart = Math.abs(a.x - b.x) >= (a.w + b.w) / 2 || Math.abs(a.y - b.y) >= size;
+    expect(apart).toBe(true);
+  });
+
   it('takes the title from front matter unless the chart sets one', () => {
     expect(render('---\ntitle: From front matter\n---\npie\n "A" : 1', options).svg).toContain('From front matter');
     expect(render('---\ntitle: From front matter\n---\npie title Own\n "A" : 1', options).svg).toContain('>Own<');
