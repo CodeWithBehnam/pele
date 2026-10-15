@@ -81,13 +81,36 @@ function context(): Context2D | null {
 
 const MAX_CACHED = 20000;
 
+// The fonts the canvas draws with.
+function canvasFonts(): FontFaceSet | undefined {
+  const g = globalThis as { document?: { fonts?: FontFaceSet }; fonts?: FontFaceSet };
+  return g.document?.fonts ?? g.fonts;
+}
+
+// Whether the canvas has the font the text is in, rather than a fallback while it loads. A width
+// measured with a fallback is not kept. One whose font cannot be checked is.
+function hasFont(fonts: FontFaceSet | undefined, font: string, text: string): boolean {
+  try {
+    return fonts?.check(font, text) ?? true;
+  } catch {
+    return true;
+  }
+}
+
 export function canvasMeasurer(fontFamily: string, monoFamily = 'monospace'): TextMeasurer | null {
   const ctx = context();
   if (!ctx) return null;
   const caches = new Map<string, Map<string, number>>();
   let currentFont = '';
+  // A font that was not in the document was measured with a fallback, though it counts as loaded.
+  let faces = canvasFonts()?.size;
   return {
     width(text, size, style) {
+      const fonts = canvasFonts();
+      if (fonts?.size !== faces) {
+        faces = fonts?.size;
+        caches.clear();
+      }
       const font =
         (style & Style.Italic ? 'italic ' : '') +
         (style & Style.Bold ? 'bold ' : '') +
@@ -100,8 +123,10 @@ export function canvasMeasurer(fontFamily: string, monoFamily = 'monospace'): Te
       if (w === undefined) {
         if (font !== currentFont) ctx.font = currentFont = font;
         w = ctx.measureText(text).width;
-        if (cache.size >= MAX_CACHED) cache.clear();
-        cache.set(text, w);
+        if (hasFont(fonts, font, text)) {
+          if (cache.size >= MAX_CACHED) cache.clear();
+          cache.set(text, w);
+        }
       }
       return w;
     },
