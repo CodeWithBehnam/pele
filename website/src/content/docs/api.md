@@ -181,14 +181,17 @@ const diagram = mount(container, source);
 
 - Measures labels using `--pele-font` and `--pele-font-mono`, or the container font if they are not set. The `fontFamily` and `fontFamilyMono` options override this.
 - Uses the container width as [`maxWidth`](#narrow-screens), unless a value is supplied.
-- Re-renders when a width change affects the layout, and when a web font that was loading when it rendered finishes loading. A diagram rendered before any other web font loaded is rendered again the next time it is refreshed or shown.
+- Re-renders when a width change affects the layout, and when a web font that was loading when it rendered finishes loading. A diagram rendered before another web font loaded in its window is rendered again the next time it is refreshed or shown.
 - Lets a diagram that was shrunk to fit be zoomed and panned. See [Zoom](#zoom).
 
 Call `refresh()` after a CSS change that affects fonts, such as a theme or font setting, and after moving the container to another window or back into the document. It re-renders only if the width or the fonts have changed, so it is cheap to call when nothing has.
 
 Use a container with a width independent of its content, such as a block element. `mount()` throws a [`PeleError`](#peleerror) as `render()` does.
 
-`mount()` renders at once, even into a container that is hidden or not in the document, so that the page can lay out around the diagram. A container that is not in the document has no font to read, so the diagram is rendered again when it is shown. While the container is hidden or not in the document, `update()` and `refresh()` leave it as it is, and it is rendered when it is shown.
+`mount()` renders at once, even into a container that is hidden or not in the document, so that the page can lay out around the diagram. After that:
+
+- While the container is hidden in the document, `update()` and `refresh()` leave the diagram as it is, and it is rendered when it is shown. If that render fails, `onError` is called.
+- While the container is not in the document, `update()` renders at once so that the new text shows when the container is put back, and `refresh()` does nothing. There is no font to read there, so the diagram is rendered again when it is shown.
 
 Mounting a diagram in a container that already has one replaces it. A container that is removed from the page can be garbage collected without calling `destroy()`.
 
@@ -207,7 +210,7 @@ An error thrown by `onRender` propagates to the caller after the diagram has bee
 | --- | --- |
 | `result` | Current `RenderResult`. |
 | `zoom` | The diagram's [`Zoom`](#zoom), or `undefined` if the `zoom` option is `false`. |
-| `update(text, options?)` | Updates the source or options. If the text cannot be rendered, it throws and the diagram stays as it was. |
+| `update(text, options?)` | Updates the source or options. If the text cannot be parsed or rendered, it throws and the diagram stays as it was. In a hidden container only parsing happens at once. A render that fails when the container is shown is reported to `onError`. |
 | `refresh()` | Re-renders if the container width or the fonts have changed, or a web font has loaded, since the last render. |
 | `destroy()` | Stops observing the container. Leaves the diagram in place. |
 

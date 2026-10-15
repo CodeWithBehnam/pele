@@ -19,24 +19,31 @@ const corpus = readdirSync('tests/corpus')
   .flatMap((file) => (JSON.parse(readFileSync(`tests/corpus/${file}`, 'utf8')) as string[]).map((source, i) => ({ name: `${file}#${i}`, source })));
 
 describe('the browser script', () => {
-  it('draws every documented diagram without built-ins newer than Safari 15.0', async () => {
-    const bundle = await build({ ...browserBuild, write: false, minify: false });
+  it('draws every documented diagram, wide and narrow, without built-ins newer than Safari 15.0', async () => {
+    // Built as it is shipped.
+    const bundle = await build({ ...browserBuild, write: false });
     // URL is the page's, not the language's, so the context is given the one Node has.
     const context = createContext({ URL });
     runInContext(`for (const [owner, names] of ${JSON.stringify(NEWER)}) { const target = eval(owner); for (const name of names) delete target[name]; }`, context);
     runInContext(bundle.outputFiles[0].text, context);
-    const draw = runInContext('(source) => { try { return pele.render(source).svg; } catch (error) { return "error: " + error.message; } }', context) as (source: string) => string;
+    const draw = runInContext(
+      '(source, maxWidth) => { try { return pele.render(source, { maxWidth }).svg; } catch (error) { return "error: " + error.message; } }',
+      context,
+    ) as (source: string, maxWidth?: number) => string;
     let drawn = 0;
-    for (const { name, source } of corpus) {
-      let expected: string;
-      try {
-        expected = render(source).svg;
-      } catch (error) {
-        expected = `error: ${(error as Error).message}`;
+    // A narrow width takes the paths that fit a diagram to a phone.
+    for (const maxWidth of [undefined, 320]) {
+      for (const { name, source } of corpus) {
+        let expected: string;
+        try {
+          expected = render(source, { maxWidth }).svg;
+        } catch (error) {
+          expected = `error: ${(error as Error).message}`;
+        }
+        expect(draw(source, maxWidth), `${name} at ${maxWidth ?? 'natural'} width`).toBe(expected);
+        if (!expected.startsWith('error')) drawn++;
       }
-      expect(draw(source), name).toBe(expected);
-      if (!expected.startsWith('error')) drawn++;
     }
-    expect(drawn).toBeGreaterThan(400);
+    expect(drawn).toBeGreaterThan(800);
   });
 });

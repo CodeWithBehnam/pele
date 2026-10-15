@@ -48,6 +48,7 @@ describe('zoom frame', () => {
 // An element holding a drawing 1200 wide that is shown `shown` wide, and the listeners it has.
 const drawingIn = (shown: number) => {
   const listening = new Map<string, number>();
+  const handlers = new Map<string, (event: unknown) => void>();
   const attributes: Record<string, string> = { width: '1200', height: '300' };
   const svg = {
     localName: 'svg',
@@ -56,6 +57,7 @@ const drawingIn = (shown: number) => {
     setAttribute: (name: string, value: string) => (attributes[name] = value),
     removeAttribute: (name: string) => delete attributes[name],
     getBoundingClientRect: () => ({ left: 0, top: 0, width: shown, height: shown / 4 }),
+    matches: (_selector: string): boolean => false,
   };
   const count = (type: string, by: number) => listening.set(type, (listening.get(type) ?? 0) + by);
   const element = {
@@ -63,12 +65,17 @@ const drawingIn = (shown: number) => {
     clientWidth: shown,
     clientHeight: shown / 4,
     style: {},
-    addEventListener: (type: string) => count(type, 1),
+    addEventListener: (type: string, handler: (event: unknown) => void) => {
+      count(type, 1);
+      handlers.set(type, handler);
+    },
     removeEventListener: (type: string) => count(type, -1),
   };
   return {
     element: element as unknown as HTMLElement,
+    svg,
     listening: (type: string) => listening.get(type) ?? 0,
+    fire: (type: string, event: unknown) => handlers.get(type)?.(event),
     show: (width: number) => {
       shown = width;
       element.clientWidth = width;
@@ -106,5 +113,23 @@ describe('zoom', () => {
     zoom.destroy();
     expect(shrunk.listening('wheel')).toBe(0);
     expect(shrunk.listening('pointerdown')).toBe(0);
+  });
+
+  it('rings a drawing focused from the keyboard, and keeps the ring where :focus-visible is not known', () => {
+    const shrunk = drawingIn(400);
+    enableZoom(shrunk.element, { controls: false });
+    const style = shrunk.svg.style as { outline?: string };
+    shrunk.fire('focusin', { target: shrunk.svg });
+    expect(style.outline).toBe('none');
+    shrunk.svg.matches = () => true;
+    shrunk.fire('focusin', { target: shrunk.svg });
+    expect(style.outline).toBe('');
+    // Safari before 15.4 throws on a selector it does not know.
+    shrunk.svg.style = {};
+    shrunk.svg.matches = () => {
+      throw new SyntaxError("':focus-visible' is not a valid selector");
+    };
+    expect(() => shrunk.fire('focusin', { target: shrunk.svg })).not.toThrow();
+    expect((shrunk.svg.style as { outline?: string }).outline).toBe('');
   });
 });

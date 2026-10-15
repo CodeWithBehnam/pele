@@ -353,9 +353,17 @@ export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: bo
   };
 
   // Browsers ring a focused SVG after a click too, where an HTML element is only ringed when
-  // the focus came from the keyboard. The drawing is treated as HTML is.
+  // the focus came from the keyboard. The drawing is treated as HTML is. Safari before 15.4 does
+  // not know :focus-visible and throws, and there the ring stays.
   const onFocus = (event: Event): void => {
-    if (svg && event.target === svg) svg.style.outline = svg.matches(':focus-visible') ? '' : 'none';
+    if (!svg || event.target !== svg) return;
+    let visible = true;
+    try {
+      visible = svg.matches(':focus-visible');
+    } catch {
+      // The ring is the browser's default.
+    }
+    svg.style.outline = visible ? '' : 'none';
   };
 
   // Safari on a Mac reports a trackpad pinch this way and no other.

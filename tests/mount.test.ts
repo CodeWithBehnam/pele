@@ -350,23 +350,55 @@ describe('mount', () => {
     delete globals.ResizeObserver;
     const doc = page();
     const dropped: WeakRef<HTMLElement>[] = [];
-    const drop = (): void => {
+    const drop = (stop = false): void => {
       for (let i = 0; i < 20; i++) {
         const el = doc.element(500);
-        mount(el, FLOW, options);
+        const handle = mount(el, FLOW, options);
+        if (stop) handle.destroy();
         dropped.push(new WeakRef(el));
       }
     };
     drop();
-    // One dropped while fonts were loading is held until they have loaded, and no longer.
+    // Nor one dropped, or stopped and dropped, while fonts are loading, before they have loaded.
     doc.fonts.loading();
     drop();
-    await doc.fonts.loaded();
-    for (let i = 0; i < 12; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      collect();
-    }
+    drop(true);
+    const settle = async (): Promise<void> => {
+      for (let i = 0; i < 12; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        collect();
+      }
+    };
+    await settle();
     expect(dropped.filter((ref) => ref.deref() !== undefined).length).toBe(0);
+    await doc.fonts.loaded();
+  });
+
+  it('measures again after a font loaded, though text that could not be drawn came between', () => {
+    const doc = page();
+    const el = doc.element(500);
+    let draws = 0;
+    const handle = mountWith(spying(() => draws++), el, SANKEY);
+    doc.fonts.done();
+    expect(() => handle.update('sankey\n\nA,B,10\nB,A,10\n')).toThrow();
+    draws = 0;
+    handle.refresh();
+    expect(draws).toBeGreaterThan(0);
+  });
+
+  it('leaves a diagram alone when a font loads in another window', () => {
+    const here = page();
+    const there = page();
+    let draws = 0;
+    const handle = mountWith(spying(() => draws++), here.element(500), FLOW);
+    mountWith(spying(() => {}), there.element(500), FLOW);
+    there.fonts.done();
+    draws = 0;
+    handle.refresh();
+    expect(draws).toBe(0);
+    here.fonts.done();
+    handle.refresh();
+    expect(draws).toBeGreaterThan(0);
   });
 
   it('leaves a diagram that is out of the document alone when a font loads, and draws it when it is back', async () => {
@@ -569,6 +601,39 @@ describe('mount', () => {
     resize(el, 340);
     expect(made[1]).toBe(handle.result.svg);
     expect(children).toEqual([{ node: 2 }]);
+  });
+
+  it('keeps the first drawing, and reports it, when the host fails on the one for the drawing\'s fonts', () => {
+    // The drawing sets --pele-font, so it is drawn a second time, which the sanitizer refuses.
+    const child = {};
+    let made = 0;
+    const el = {
+      ...element(500),
+      firstElementChild: null as object | null,
+      put: '',
+      replaceChildren(node: { svg: string }) {
+        this.put = node.svg;
+        this.firstElementChild = child;
+      },
+    };
+    globals.getComputedStyle = (target: unknown) => ({
+      fontFamily: target === child ? 'Inter' : 'Georgia',
+      paddingLeft: '0px',
+      paddingRight: '0px',
+      getPropertyValue: (name: string) => (target === child && name === '--pele-font' ? 'Inter' : ''),
+    });
+    const reported: RenderResult[] = [];
+    const handle = mount(el as unknown as HTMLElement, FLOW, {
+      ...options,
+      onRender: (result) => reported.push(result),
+      sanitize: (svg) => {
+        if (++made > 1) throw new Error('sanitizer');
+        return { svg } as unknown as Node;
+      },
+    });
+    expect(made).toBe(2);
+    expect(handle.result.svg).toBe(el.put);
+    expect(reported.map((result) => result.svg)).toEqual([el.put]);
   });
 
   it('stops the diagram an element had when another is mounted in it', async () => {
