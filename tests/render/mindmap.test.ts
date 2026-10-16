@@ -87,6 +87,17 @@ describe('mindmap rendering', () => {
     expect(single[0].x).toBeLessThan(single[1].x);
   });
 
+  it('keeps branch sides when a growing final branch reaches a balanced tie', () => {
+    const start = 'mindmap\n  [root]\n    [Build]\n      [Prototype]\n      [Iterate]\n    [Review]\n      [Test]\n      [Refine]';
+    for (const tail of ['', '\n    [Ship]', '\n    [Ship]\n      [Launch]', '\n    [Ship]\n      [Launch]\n      [Learn]']) {
+      const all = boxes(render(start + tail, options).svg);
+      const x = (id: string): number => all.find(box => box.id === id)!.x;
+      expect(x('Build')).toBeGreaterThan(x('root'));
+      expect(x('Review')).toBeLessThan(x('root'));
+      if (tail) expect(x('Ship')).toBeLessThan(x('root'));
+    }
+  });
+
   it('never overlaps nodes', () => {
     const rnd = random(11);
     for (let round = 0; round < 30; round++) {

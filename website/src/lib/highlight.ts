@@ -73,6 +73,7 @@ function highlightYamlLine(line: string) {
   return escapeHtml(entry[1]) + span('syn-yaml-key', entry[2]) + span('syn-punctuation', entry[3]) + escapeHtml(entry[4]) + highlighted;
 }
 
+const mermaidDeclaration = /^(?:xychart(?:-beta)?|gitGraph|pie|mindmap|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|journey|timeline|quadrantChart|requirement(?:Diagram)?|C4(?:Context|Container|Component|Dynamic|Deployment)|(?:architecture|sankey|block|packet|kanban|radar|treemap|info|agentflow|usecase|treeView|venn|cynefin|wardley|swimlane|ishikawa|eventmodeling)(?:-beta)?|railroad-(?:ebnf-|abnf-|peg-)?beta)\b/;
 const mermaidKeyword = /^(?:flowchart-elk|flowchart|graph|subgraph|end|direction|click|style|classDef|class|linkStyle|interpolate|call|href|callback)\b/;
 const mermaidLink = /^(?:[xo<](?=--|==|-\.))?(?:--+|==+|-\.+-?|~~~+)(?:>|[xo](?!\w))?/;
 const mermaidLinkEnd = /(?:--+|==+|\.+-+)(?:>|[xo](?!\w))?/;
@@ -193,6 +194,8 @@ function highlightMermaidLine(line: string, state: HighlightState) {
     } else if (styleTarget > 1 && /^[\w-]+\s*:/.test(rest)) {
       output += highlightDeclarations(rest);
       break;
+    } else if (/^\s*$/.test(line.slice(0, index)) && (match = rest.match(mermaidDeclaration))) {
+      output += span('syn-keyword', match[0]);
     } else if ((match = rest.match(mermaidKeyword))) {
       output += span('syn-keyword', match[0]);
       expectsDirection = /^(?:flowchart|graph|direction)/.test(match[0]);

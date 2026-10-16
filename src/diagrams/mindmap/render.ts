@@ -175,7 +175,7 @@ function draw(model: MindmapModel, config: Config, options: RenderOptions, down:
     for (let k = 1; k < count; k++) {
       right += extent[branches[k - 1].id];
       const diff = Math.abs(2 * right - total + (2 * k - count) * BRANCH_GAP_Y);
-      if (diff <= best) {
+      if (diff < best) {
         best = diff;
         split = k;
       }

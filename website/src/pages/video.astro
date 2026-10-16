@@ -1,0 +1,121 @@
+---
+import '@fontsource-variable/inter/wght.css';
+import '../styles/pele-theme.scss';
+import endCard from '../../video/end-card.svg';
+import endCardSource from '../../video/end-card.svg?raw';
+const lockupPaths = [...endCardSource.matchAll(/<path d="([^"]+)"/g)].map(match => match[1]);
+const wordContours = lockupPaths[0].split(/(?=M)/).filter(Boolean);
+const letters = [[2, 6], [0, 5], [3], [1, 4]].map(parts => parts.map(index => wordContours[index]).join(" "));
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Pele · Video prototype</title>
+  </head>
+  <body>
+    <main>
+      <div class="viewer">
+        <div class="frame" aria-label="Portrait video preview">
+          <div class="film" data-pele-theme="light">
+            <svg class="outro" viewBox="0 0 966 1365.333" aria-hidden="true">
+              <rect class="outro-screen" fill="#fffcf0" />
+              <g class="outro-word">
+                <g transform="scale(.3333333333)">
+                  {letters.map(d => <path class="outro-letter" d={d} fill="#fffcf0" />)}
+                </g>
+              </g>
+              <g class="outro-icon">
+                <g transform="scale(.3333333333)">
+                  <path d={lockupPaths[1]} fill="#da702c" />
+                  <path d={lockupPaths[2]} fill="#3e1715" />
+                </g>
+              </g>
+            </svg>
+            <div class="diagram"></div>
+            <div class="film-copy">
+              <pre class="source"><code></code></pre>
+            </div>
+            <img class="end-card" src={endCard.src} alt="Pele" />
+          </div>
+        </div>
+      </div>
+      <aside>
+        <div class="transport">
+          <button id="play" type="button" disabled>Loading…</button>
+          <button id="restart" type="button" aria-label="Restart">↺</button>
+          <label class="speed-label">Speed <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+        </div>
+        <input id="timeline" type="range" min="0" max="1" step="0.01" value="0" aria-label="Video timeline" />
+        <div class="time"><output id="time">0:00</output><span>2898 × 4096</span></div>
+        <nav class="chapters" aria-label="Scenes"></nav>
+        <label class="theme-label">Theme <select id="theme" aria-label="Preview theme"></select></label>
+        <details open>
+          <summary>Edit the current syntax</summary>
+          <textarea id="editor" spellcheck="false" aria-label="Current Mermaid source"></textarea>
+          <div class="editor-footer"><span id="status" role="status">Live preview</span><button id="reset" type="button">Back to timeline</button></div>
+        </details>
+      </aside>
+    </main>
+    <script src="../scripts/video-prototype.ts"></script>
+  </body>
+</html>
+<style>
+  @font-face { font-family: 'Paper Mono'; src: local('Paper Mono Regular'), local('PaperMono-Regular'), local('Paper Mono'); font-style: normal; font-weight: 100 900; }
+  :global(*) { box-sizing: border-box; }
+  :global(body) { margin: 0; background: #171615; color: #e6e4d9; font: 14px/1.5 'Inter Variable', sans-serif; }
+  main { display: flex; justify-content: center; gap: clamp(30px, 5vw, 88px); padding: 32px; min-height: 100vh; }
+  .viewer { display: flex; align-items: center; justify-content: center; }
+  .frame { position: relative; width: min(56vw, calc((100vh - 64px) * 2898 / 4096)); aspect-ratio: 2898 / 4096; overflow: hidden; background: #100f0f; box-shadow: 0 12px 70px #0005; }
+  .film { width: 966px; height: calc(4096px / 3); transform-origin: top left; position: relative; background: var(--pele-bg); color: var(--pele-fg); --font-sans: 'Inter Variable', sans-serif; --font-mono: 'Paper Mono', monospace; --radius-small: 6px; }
+  .film-copy { position: absolute; inset: 0; pointer-events: none; }
+  .source { position: absolute; left: 44px; top: 0; right: 44px; height: 361.6px; overflow: hidden; margin: 0; font: 32px/1.4 'Paper Mono', monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .source { mask-image: linear-gradient(to bottom, transparent, #000 var(--source-fade, 0px)); }
+  :global(.source.scrolling) { --source-fade: 96px; }
+  :global(.film[data-scene="Git"] .source) { height: 406.4px; }
+  .source code { display: block; position: relative; padding-top: 48px; }
+  :global(.source-cursor) { display: inline-block; width: 0; height: 1.15em; border-left: 3px solid var(--pele-series-2); vertical-align: -.18em; margin-right: -3px; }
+  .diagram { position: absolute; inset: 400px 30px 164px; }
+  :global(.drawing) { position: absolute; inset: 0; display: grid; place-items: center; }
+  :global(.drawing > svg) { display: block; width: 100%; height: 100%; max-width: none !important; }
+  .outro { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; overflow: visible; }
+  .end-card { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+  :global(.film.ending .end-card) { opacity: 1; }
+  :global(.source .syn-keyword), :global(.source .syn-type) { color: var(--pele-accent); }
+  :global(.source .syn-string) { color: var(--pele-series-4); }
+  :global(.source .syn-punctuation) { color: var(--pele-muted); }
+  :global(.source .syn-number) { color: var(--pele-series-3); }
+  aside { width: 350px; flex: 0 0 350px; align-self: center; }
+  .time { color: #878580; font-size: 12px; }
+  button, select, textarea { font: inherit; color: inherit; }
+  button, select { border: 1px solid #403e3c; background: #282726; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+  button:hover { background: #343331; }
+  button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid #ec8b49; outline-offset: 3px; }
+  .transport { display: flex; gap: 8px; align-items: center; }
+  #play { background: #da702c; color: #100f0f; border-color: #da702c; min-width: 100px; font-weight: 600; }
+  .speed-label { margin-left: auto; color: #878580; font-size: 12px; }
+  select { margin-left: 5px; }
+  #timeline { width: 100%; margin: 20px 0 4px; accent-color: #da702c; cursor: pointer; }
+  .time { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+  .chapters { display: flex; gap: 6px; margin-top: 24px; flex-wrap: wrap; }
+  :global(.chapters button) { padding: 7px 10px; font: inherit; font-size: 12px; color: #e6e4d9; background: #282726; border: 1px solid #403e3c; border-radius: 6px; cursor: pointer; }
+  :global(.chapters button:hover) { background: #343331; }
+  :global(.chapters button:focus-visible) { outline: 2px solid #ec8b49; outline-offset: 3px; }
+  :global(.chapters button[aria-current="true"]) { color: #ec8b49; border-color: #da702c; }
+  .theme-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; color: #b7b5ac; font-size: 12px; }
+  details { border-top: 1px solid #343331; padding-top: 18px; }
+  summary { cursor: pointer; margin-bottom: 12px; }
+  textarea { width: 100%; min-height: 190px; resize: vertical; border: 1px solid #403e3c; border-radius: 6px; background: #100f0f; padding: 12px; font: 13px/1.6 'Paper Mono', monospace; tab-size: 2; }
+  .editor-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: #878580; }
+  #status { max-width: 180px; overflow-wrap: anywhere; }
+  #reset { background: none; border: none; padding-right: 0; font-size: 11px; }
+  @media (max-width: 800px) { main { flex-direction: column; align-items: center; padding: 18px; gap: 28px; } .frame { width: min(100%, 470px); } .viewer { width: 100%; } aside { width: min(100%, 470px); flex-basis: auto; } }
+  :global(body.capture) { overflow: hidden; }
+  :global(body.capture) main { display: block; padding: 0; }
+  :global(body.capture) .viewer { display: block; }
+  :global(body.capture) .frame { width: 100vw; height: 100vh; box-shadow: none; }
+  :global(body.capture) aside { position: fixed; inset: 0 auto auto 0; opacity: 0; pointer-events: none; }
+  :global(body.capture astro-dev-toolbar) { display: none; }
+</style>
