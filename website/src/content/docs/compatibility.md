@@ -45,54 +45,48 @@ Pele supports every diagram type built into Mermaid 12.1.0. Browse the [examples
 | Treemap | `treemap`, `treemap-beta` |
 | Info | `info` |
 
-ZenUML is a separate Mermaid plugin and is not supported. For unsupported diagram types, [`supports()`](/api#supports) returns `false` and [`render()`](/api#render) throws a `PeleError` with the code `unsupported-diagram`. An app can use this to fall back to Mermaid.
+ZenUML and other external Mermaid plugins are not supported. Use [`supports()`](/api#supports) to check whether a diagram type is available.
 
 ## Syntax
 
-Frontmatter, `%%{init}%%` directives, comments, and accessibility titles and descriptions are parsed as Mermaid parses them.
+Pele supports frontmatter, `%%{init}%%` directives, comments, and accessibility titles and descriptions. Configuration support varies by diagram type.
 
 ## Differences from Mermaid
 
 ### Layout and appearance
 
-Diagrams preserve the nodes, connections, and labels from the source. Positions, sizes, spacing, and edge routing differ from Mermaid.
+Pele uses its own layout. Node positions, spacing, and edge paths differ from Mermaid.
 
-Colors come from [CSS variables](/theming). Mermaid's named themes are not used.
+Set colors with [CSS variables](/theming). Mermaid themes and `themeVariables` colors do not apply.
 
 ### Sizing
 
-Diagrams scale down to fit narrower containers. Pass [`maxWidth`](/api#narrow-screens) to adapt supported layouts to the available width and keep labels readable. Horizontal diagrams can switch to a vertical layout on narrow screens.
+Diagrams scale down to fit narrower containers. Pass [`maxWidth`](/api#narrow-screens) to let the layout adapt. For example, a wide flowchart may switch to a vertical layout.
 
-The SVG retains its `width` and `height` attributes, giving it an intrinsic size when used as an image. Set `responsive: false` or Mermaid's `useMaxWidth: false` for a fixed size.
+Set `responsive: false` for a fixed pixel size.
 
 ### Subgraphs
 
-A `direction` statement inside a subgraph always applies. In Mermaid it is ignored when one of the subgraph's nodes is linked to a node outside it. A subgraph with no `direction` statement uses the direction of the graph around it.
-
-A subgraph with no name is accepted. Mermaid 12.1.0 fails on it.
+A flowchart subgraph keeps its own `direction` even when it links to nodes outside the subgraph.
 
 ### Limits
 
-Flowcharts are limited to 5,000 edges. Mermaid stops at 500. Change the limit with [`maxEdges`](/api#renderoptions). A `maxEdges` value in the diagram's configuration is ignored.
-
-The default source limit is 50,000 characters, matching Mermaid. Pele also limits SVG output to 4,000,000 characters. Change these with [`limit` and `outputLimit`](/api#renderoptions).
-
-In large graphs, long edges use simplified curves that may pass behind nodes.
+Pele limits source length, SVG output size, and edges in flowcharts and agentflow. See [Security](/security#limits) for defaults and options.
 
 ### Labels
 
-Labels are SVG text. Pele does not create HTML labels with `<foreignObject>`, so a label cannot contain arbitrary HTML. Line breaks, bold, and italic are supported, both in Markdown strings and with the `<br>`, `<b>`, and `<i>` tags. Other HTML tags in a label are removed and their text is kept.
+Labels use SVG text with support for line breaks, bold, and italic. Arbitrary HTML labels are not supported.
 
 ### Interaction
 
-`click` statements that open a link are supported. `click … call` and `click … callback` statements are parsed, but Pele never executes them. The SVG contains no scripts and no event handlers.
+`click` statements that open a link are supported. JavaScript callbacks are ignored.
 
-Links and images are filtered by URL scheme. See [Security](/security#links-and-images) for allowed schemes and configuration.
+See [Security](/security#links-and-images) to configure allowed links and images.
 
 ### Icons
 
-Pele does not include icons. Pass an [`icons`](/api#renderoptions) resolver to supply them. An icon reference such as `fa:fa-car` is drawn only when the resolver returns markup for it. Otherwise it is omitted and takes no space.
+Pass an [`icons`](/api#renderoptions) resolver to supply custom icons such as `fa:fa-car`. Architecture and tree view also have built-in symbols.
 
 ## Reporting differences
 
-If Mermaid accepts a diagram that Pele rejects, or Pele parses it differently, that is a bug. Compare the two in the [Playground](/playground) and [report it](https://github.com/obsidianmd/pele/issues).
+If Pele rejects or misreads Mermaid 12.1.0 syntax, compare the diagram in the [Playground](/playground) and [report the difference](https://github.com/obsidianmd/pele/issues).

@@ -211,6 +211,10 @@
   margin-top: 56px;
 }
 
+.comparison-detail {
+  color: var(--muted);
+}
+
 .guide-links {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

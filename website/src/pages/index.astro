@@ -14,6 +14,7 @@ import { repositoryUrl } from '../lib/site';
 
 const headings = [
   { depth: 2, slug: 'how-it-works', text: 'How it works' },
+  { depth: 2, slug: 'why-pele', text: 'Why Pele?' },
   { depth: 2, slug: 'install-title', text: 'Pele in your app' },
   { depth: 2, slug: 'explore-title', text: 'Explore' },
   { depth: 2, slug: 'pele-in-use', text: 'Pele in use' },
@@ -69,7 +70,7 @@ document.querySelector('#diagram').innerHTML = svg;`;
               <div class="home-example-status home-example-time"></div>
             </div>
           </div>
-          <p class="home-example-description">Use CSS variables to set colors and fonts. Diagrams automatically adapt to theme changes without being re-rendered.</p>
+          <p class="home-example-description">Use CSS variables to set colors and fonts. Color changes apply without re-rendering.</p>
           <div class="home-example-panel">
             <div class="home-example-block home-example-source" data-code-block data-home-editor="css">
               <div class="home-example-label"><span>CSS</span><span class="doc-code-actions"><CopyButton /></span></div>
@@ -79,6 +80,25 @@ document.querySelector('#diagram').innerHTML = svg;`;
               <div class="home-example-label"><span>Pele</span></div>
               <figure class="home-example-figure" aria-label="Flowchart rendered by Pele in a light theme" set:html={draw(themeExample, 'theme-')} />
             </div>
+          </div>
+        </section>
+
+        <section class="guide-section" aria-labelledby="why-pele">
+          <header class="guide-heading">
+            <h2 id="why-pele">Why Pele?</h2>
+            <p>Zero runtime dependencies, 6× smaller, and up to 500× faster than Mermaid.js. Pele supports every diagram type built into Mermaid 12.1.0.</p>
+          </header>
+          <div class="table-wrap" role="region" aria-labelledby="why-pele" tabindex="0">
+            <table>
+              <thead><tr><td></td><th scope="col">Pele</th><th scope="col">Mermaid.js</th></tr></thead>
+              <tbody>
+                <tr><td>Bundle size <small class="comparison-detail">gzip</small></td><td>230 kB</td><td>1.6 MB</td></tr>
+                <tr><td>Render time</td><td>0.05–0.3 ms</td><td>6–82 ms</td></tr>
+                <tr><td>Runtime dependencies</td><td>None</td><td>23</td></tr>
+                <tr><td>Small screens</td><td>Adapts the layout</td><td>Scales the diagram</td></tr>
+                <tr><td>Theming</td><td>CSS variables</td><td>Theme configuration</td></tr>
+              </tbody>
+            </table>
           </div>
         </section>
 
@@ -123,4 +143,3 @@ document.querySelector('#diagram').innerHTML = svg;`;
 <script>
   import '../scripts/home';
 </script>
-

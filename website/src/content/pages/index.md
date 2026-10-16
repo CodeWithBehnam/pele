@@ -22,7 +22,7 @@ flowchart TD
   D --> E
 ```
 
-Use CSS variables to set colors and fonts. Diagrams automatically adapt to theme changes without being re-rendered.
+Use CSS variables to set colors and fonts. Color changes apply without re-rendering.
 
 ### CSS
 
@@ -37,6 +37,18 @@ Use CSS variables to set colors and fonts. Diagrams automatically adapt to theme
   --pele-border: #cecdc3;
 }
 ```
+
+## Why Pele?
+
+Zero runtime dependencies, 6× smaller, and up to 500× faster than Mermaid.js. Pele supports every diagram type built into Mermaid 12.1.0.
+
+| | Pele | Mermaid.js |
+| --- | --- | --- |
+| Bundle size gzip | 230 kB | 1.6 MB |
+| Render time | 0.05–0.3 ms | 6–82 ms |
+| Runtime dependencies | None | 23 |
+| Small screens | Adapts the layout | Scales the diagram |
+| Theming | CSS variables | Theme configuration |
 
 ## Pele in your app
 

@@ -1,6 +1,6 @@
 # Pele
 
-Pele renders [Mermaid](https://mermaid.js.org) diagrams to SVG. It is small, synchronous, has no dependencies, and uses CSS variables for colors and fonts.
+Pele renders [Mermaid](https://mermaid.js.org) diagrams to SVG. It is small, synchronous, has no runtime dependencies, and uses CSS variables for colors and fonts.
 
 Pele supports every diagram type built into Mermaid 12.1.0.
 
@@ -17,10 +17,8 @@ npm install pele
 ```ts
 import { render } from 'pele';
 
-const { svg } = render(`flowchart TD
-  A[Mermaid text] --> B{Flowchart?}
-  B -- Yes --> C[Pele]
-  B -- No --> D[Mermaid]`);
+const { svg } = render(`flowchart LR
+  A[Mermaid text] --> B[SVG]`);
 
 document.querySelector('#diagram').innerHTML = svg;
 ```
@@ -33,7 +31,7 @@ import { mount } from 'pele';
 mount(document.querySelector('#diagram'), text);
 ```
 
-`supports(text)` checks whether a diagram type is available. `render()` throws a `PeleError` for unsupported types, syntax errors, and other rendering failures.
+See the [API](https://pele.run/api) for options and error handling.
 
 The main entry point includes every diagram type. Reduce the initial bundle size by registering individual types or loading them on demand:
 
@@ -73,11 +71,11 @@ Charts use `--pele-series-1` through `--pele-series-8`. Colors adapt to theme ch
 
 ## Security
 
-The SVG contains no scripts, event handlers, or HTML, and Pele never runs code from a diagram. Links and images are limited to web addresses by default, and both the source and the output have a size limit. An error message quotes the diagram source, so show it as text. See [SECURITY.md](SECURITY.md) for handling untrusted diagrams.
+Pele escapes diagram text, filters links and styles, and limits source and output size. See [Security](https://pele.run/security) for handling untrusted diagrams, displaying errors, and supplying icons.
 
 ## Compatibility
 
-Pele targets the syntax of Mermaid 12.1.0. Each of its parsers runs Mermaid's own parser specs for that diagram type and is fuzzed against Mermaid's parser. Layout and visual style are Pele's own.
+Pele targets Mermaid 12.1.0 syntax, with its own layout and visual style. Its parsers are tested against Mermaid's parser specs and with differential fuzzing.
 
 ## Develop
 
@@ -88,17 +86,18 @@ npm run build
 npm run bench
 ```
 
-The documentation site and playground are in `website/`:
+The documentation site and playground are in `website/` and use Node 24 and pnpm 12. With nvm:
 
 ```sh
 cd website
+nvm use
 pnpm install
 pnpm dev
 ```
 
 After installing the website dependencies, run `npm run test:website` from the repository root to check the playground.
 
-See [Contributing](CONTRIBUTING.md) for parser testing and website deployment.
+See [Contributing](CONTRIBUTING.md) for parser testing.
 
 ## License
 
