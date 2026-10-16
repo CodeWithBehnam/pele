@@ -36,7 +36,6 @@ export interface Mounted {
   destroy(): void;
 }
 
-// What a diagram is parsed and drawn with: the functions of the entry point that mounted it.
 export interface Engine {
   parse(text: string, options: RenderOptions): DiagramModel;
   render(model: DiagramModel, options: RenderOptions): RenderResult;
@@ -96,7 +95,6 @@ const mounts = new WeakMap<HTMLElement, Mounted>();
 // Puts a diagram in an element and keeps it fitted to the element's width. The element should
 // be one whose width does not depend on what it holds, such as a block.
 export function mountWith(engine: Engine, element: HTMLElement, text: string, options: MountOptions = {}): Mounted {
-  // An element shows one diagram. Mounting another stops the one before it.
   mounts.get(element)?.destroy();
 
   let source = text;
@@ -108,9 +106,6 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
   // Whether the width there is can change how this diagram is drawn. Not known until asked.
   let adapts: boolean | undefined;
   let drawnFor = -1;
-  // Whether what is shown is not what the element should show: it was drawn out of the
-  // document, with neither fonts nor a width to read, or text or fonts came while it was hidden.
-  // It is drawn anew when it is next shown.
   let stale = false;
   let waiting = false;
   let destroyed = false;
@@ -142,7 +137,6 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
     else element.innerHTML = svg;
   };
 
-  // A diagram drawn while a font is loading is drawn anew once it has loaded.
   const awaitFonts = (): void => {
     if (waiting || destroyed) return;
     const loading = fontSets(element).filter((fonts) => fonts.status === 'loading');
@@ -202,7 +196,6 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
     zoomer = wanted === false ? undefined : zoomWith(element, typeof wanted === 'object' ? wanted : { always: wanted === true }, false);
   };
 
-  // An element that is hidden or out of the document has no width to draw for.
   const hidden = (): boolean => element.isConnected === false || !(element.clientWidth > 0);
   // One out of the document is drawn as a guess, so that it shows the text when it is put back
   // before the observer can see it, at the size it had. A hidden one in the document waits.
@@ -252,8 +245,6 @@ export function mountWith(engine: Engine, element: HTMLElement, text: string, op
       return zoomer;
     },
     update(next, nextOptions = settings) {
-      // The same text under the same limits is the same model. Text that cannot be parsed
-      // throws here, before anything has changed.
       const reparse =
         next !== source ||
         nextOptions.limit !== settings.limit ||

@@ -269,7 +269,6 @@ Rel(d, q, "y")`);
     expect(draw('C4Context\nSystem(a, "A")\nSystem(b, "B")\nRel(a, b, "x")').svg).not.toContain('Q');
   });
 
-  // The corners of each relation's line, read back from its path; a loop has none.
   const corners = (svg: string): Map<string, number[]> => {
     const out = new Map<string, number[]>();
     for (const [, id, d] of svg.matchAll(/class="pele-edge" data-id="([^"]+)"[^>]*><path d="([^"]+)"/g)) {
@@ -311,7 +310,6 @@ Rel(d, q, "y")`);
             if (name === rel.from || name === rel.to) continue;
             for (let i = 2; i < points.length; i += 2) {
               const [x0, y0, x1, y1] = [points[i - 2], points[i - 1], points[i], points[i + 1]];
-              // Sampled along the stretch: a point inside the shape, by more than a pixel, is behind it.
               for (let t = 0; t <= 1; t += 0.02) {
                 const x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
                 const inside = x > b.x + 1 && x < b.x + b.w - 1 && y > b.y + 1 && y < b.y + b.h - 1;
@@ -334,7 +332,6 @@ Rel(d, q, "y")`);
     const lines = corners(svg);
     const lane = (id: string): number => {
       const points = lines.get(id)!;
-      // Across, along the gap, and across again, at right angles.
       for (let i = 2; i < points.length; i += 2) expect(points[i] === points[i - 2] || points[i + 1] === points[i - 1], id).toBe(true);
       return points[4];
     };
@@ -452,7 +449,6 @@ UpdateElementStyle(nobody, "red")`);
       expect(y).toBeGreaterThan(a.y + a.h);
       expect(y + 20).toBeLessThan(b.y);
     }
-    // A container that fits the natural drawing still preserves the author's offsets.
     const wide = draw(source);
     expect(render(parsed, { ...options, maxWidth: wide.width }).svg).toBe(wide.svg);
     expect(wide.svg).not.toBe(draw(withoutOffsets).svg);

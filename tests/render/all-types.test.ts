@@ -59,7 +59,6 @@ describe('every diagram type', () => {
     const src = 'flowchart LR\n  A --> B --> C';
     expect(() => parse(src, { maxEdges: 1 })).toThrow(PeleError);
     expect(() => parse(src, { limit: 5 })).toThrow(PeleError);
-    // A model that was parsed is drawn whatever limits the render names.
     expect(render(parse(src), { ...options, maxEdges: 1, limit: 5 }).type).toBe('flowchart');
     const config = { flowchart: { useMaxWidth: false } };
     expect(render(parse(src, { config }), options).svg).toBe(render(src, { ...options, config }).svg);
@@ -177,7 +176,6 @@ describe('every diagram type', () => {
         if (name === 'er' && /[%\\]/.test(url)) continue;
         const { svg, links } = render(template.replace('URL', () => url), options);
         // Kanban and C4 do not read entity codes in an address, which leaves a relative one.
-        // Everywhere else a refused address leaves nothing: no link, no image, no entry in `links`.
         const left = name === 'kanban' || name === 'c4' ? /^file#58;.*$/ : /^$/;
         for (const href of hrefs(svg)) expect(href, `${name}: ${url}`).toMatch(left);
         for (const link of links) if (!link.internal) expect(link.href, `${name}: ${url}`).toMatch(left);
@@ -218,7 +216,6 @@ describe('every diagram type', () => {
         const { svg, links } = render(src, { ...options, links: false, images: false });
         expect(svg, `${name}: ${url}`).not.toMatch(/<a\b|<image\b| href=/);
         expect(links, `${name}: ${url}`).toEqual([]);
-        // What the link was around is still drawn, at the size it had.
         expect([render(src, { ...options, links: false }).width, render(src, { ...options, links: false }).height], `${name}: ${url}`).toEqual([drawn.width, drawn.height]);
       }
     }

@@ -249,7 +249,6 @@ function verticalJourney(model: JourneyModel, options: RenderOptions): Rendered 
     body += labelSvg(label, pad + PAD_X + label.width / 2, y + PAD_Y + label.height / 2, ' class="pele-label"');
     const cx = pad + w - 28;
     body += face(cx, y + PAD_Y + FACE, task.score > 3 ? 'happy' : task.score < 3 ? 'sad' : 'neutral');
-    // The score reads as the wide chart places it: within its scale, and absent when it is not a number.
     if (!Number.isNaN(task.score)) body += `<text class="pele-journey-score" x="${num(cx)}" y="${num(y + PAD_Y + 2 * FACE + small)}" font-size="${small}" text-anchor="middle">${num(Math.min(5, Math.max(1, task.score)))}</text>`;
     let py = y + PAD_Y + textH + 4;
     for (const person of people) {

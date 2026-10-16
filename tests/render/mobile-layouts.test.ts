@@ -195,7 +195,6 @@ describe('mobile diagram layouts', () => {
     const lane = narrow.svg.slice(narrow.svg.indexOf('data-id="C/RM: CustomerAccountManagement"'), narrow.svg.indexOf('data-id="02"'));
     const lines = [...lane.matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/g)].map(match => match[1].replace(/<[^>]+>/g, ''));
     expect(lines).toEqual(['C/RM:', 'CustomerAccountManagement']);
-    // Nothing is painted over the arrow, and it is right of the heading's widest line.
     expect(lane).not.toContain('<rect');
     const left = 8 + 12;
     for (const line of lines) expect(arrow).toBeGreaterThan(left + metricsMeasurer.width(line, 14, 1));
@@ -277,7 +276,6 @@ describe('mobile diagram layouts', () => {
   it('preserves literal text, Unicode and styled spans through long-word wrapping', () => {
     const raw = '<literal>& emoji 🐈 中文 ' + 'filename_'.repeat(40);
     const label = literalLabel(raw, metricsMeasurer, 16, 100);
-    // Only the spaces a line breaks at are dropped, so that a line's width is that of its text.
     const lines = label.lines.flat().map(span => span.text);
     expect(lines.join('').replace(/\s/g, '')).toBe(raw.replace(/\s/g, ''));
     for (const line of lines) expect(line).toBe(line.trim());

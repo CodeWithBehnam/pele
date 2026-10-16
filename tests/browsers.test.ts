@@ -20,7 +20,6 @@ const corpus = readdirSync('tests/corpus')
 
 describe('the browser script', () => {
   it('draws every documented diagram, wide and narrow, without built-ins newer than Safari 15.0', async () => {
-    // Built as it is shipped.
     const bundle = await build({ ...browserBuild, write: false });
     // URL is the page's, not the language's, so the context is given the one Node has.
     const context = createContext({ URL });
@@ -31,7 +30,6 @@ describe('the browser script', () => {
       context,
     ) as (source: string, maxWidth?: number) => string;
     let drawn = 0;
-    // A narrow width takes the paths that fit a diagram to a phone.
     for (const maxWidth of [undefined, 320]) {
       for (const { name, source } of corpus) {
         let expected: string;

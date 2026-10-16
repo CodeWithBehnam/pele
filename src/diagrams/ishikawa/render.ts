@@ -255,7 +255,6 @@ function verticalCauses(model: IshikawaModel, options: RenderOptions): Rendered 
   const room = Math.max(140, (options.maxWidth ?? 320) - 2 * pad);
   const title = layoutLabel(model.title, false, measurer, size, titleRoom(options), Style.Bold);
   const order: { node: IshikawaNode; depth: number; parent: number; x: number; y: number; w: number; h: number; label?: Label }[] = [];
-  // A stack retains the outline's depth-first order without using the JavaScript call stack.
   const pending = model.root ? [{ node: model.root!, depth: 0, parent: -1 }] : [];
   let depth = 0;
   while (pending.length) {

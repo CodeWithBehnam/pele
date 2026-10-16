@@ -139,14 +139,12 @@ describe('lane layout', () => {
     const returned = endSide(edges[5].route, 0, nodes[2]);
     expect(new Set([incoming, accepted, returned]).size).toBe(3);
     expect([incoming, accepted, returned]).not.toContain(-1);
-    // The return turns one corner: it leaves towards the other lane and arrives along the flow.
     const back = edges[5];
     let corners = 0;
     for (let p = 6; p < back.route.length; p += 3) {
       if ((back.route[p] === back.route[p - 3]) !== (back.route[p - 3] === back.route[p - 6])) corners++;
     }
     expect(corners).toBe(1);
-    // Every segment of the return is orthogonal, and its label clears every step.
     for (let p = 3; p < back.route.length; p += 3) {
       expect(back.route[p] === back.route[p - 3] || back.route[p + 1] === back.route[p - 2]).toBe(true);
     }
@@ -159,8 +157,6 @@ describe('lane layout', () => {
   });
 
   it.each(DIRS)('keeps a handoff into a step apart from the handoff out of it in %s', (dir) => {
-    // One lane sends work to a step in the other and gets it back. Another step in the way
-    // leaves each handoff a single simple path, and the two must not be the same one.
     const nodes = [cnode(110, 38), cnode(110, 38), cnode(100, 38), cnode(110, 38), group(), group()];
     nodes[0].parent = nodes[1].parent = 5;
     nodes[2].parent = nodes[3].parent = 4;
@@ -181,7 +177,6 @@ describe('lane layout', () => {
   });
 
   it.each(DIRS)('takes a return past the steps between around the margin of its lane in %s', (dir) => {
-    // collect -> validate | review -> decide | schedule -> complete, with decide returning to collect.
     const nodes = [cnode(140, 44), cnode(140, 44), cnode(140, 44), cnode(120, 76), cnode(140, 44), cnode(140, 44), group(), group(), group()];
     nodes[0].parent = nodes[1].parent = 8;
     nodes[2].parent = nodes[3].parent = 7;
@@ -192,10 +187,8 @@ describe('lane layout', () => {
     const across = (c: CNode): number => (sideways ? c.y : c.x);
     const along = (c: CNode): number => (sideways ? c.x : c.y);
     const depth = (c: CNode): number => (sideways ? c.w : c.h);
-    // With no room kept for the return, the steps of a lane line up.
     expect(across(nodes[0])).toBeCloseTo(across(nodes[1]), 6);
     expect(across(nodes[4])).toBeCloseTo(across(nodes[5]), 6);
-    // It leaves the decision by a side of its own and reaches the first step clear of its way out.
     const back = edges[5].route;
     const sides = [endSide(edges[2].route, edges[2].route.length - 3, nodes[3]), endSide(edges[3].route, 0, nodes[3]), endSide(back, 0, nodes[3])];
     expect(new Set(sides).size).toBe(3);
@@ -208,14 +201,12 @@ describe('lane layout', () => {
         expect(Math.max(back[p], back[p - 3]) <= l || Math.min(back[p], back[p - 3]) >= r || Math.max(back[p + 1], back[p - 2]) <= t || Math.min(back[p + 1], back[p - 2]) >= b).toBe(true);
       }
     }
-    // A handoff turns beside its steps, so their ranks sit closer than those of steps in one lane.
     const gap = (a: number, b: number): number => Math.abs(along(nodes[b]) - along(nodes[a])) - (depth(nodes[a]) + depth(nodes[b])) / 2;
     expect(gap(1, 2)).toBeLessThan(gap(0, 1));
     expect(gap(0, 1)).toBeCloseTo(OPTIONS.rankSep, 6);
   });
 
   it.each(DIRS)('draws a link asked to be longer at its length beside a handoff in %s', (dir) => {
-    // One lane holds a -> b -> f, the other c, and f hands off to c. The first link asks for two ranks.
     const nodes = [cnode(80, 40), cnode(80, 40), cnode(80, 40), cnode(80, 40), group(), group()];
     nodes[0].parent = nodes[1].parent = nodes[2].parent = 5;
     nodes[3].parent = 4;
@@ -228,7 +219,6 @@ describe('lane layout', () => {
   });
 
   it('routes a handoff by where the label of a relation to a lane is', () => {
-    // The lane's relation ends far down its chain, and its label is nowhere near the handoff.
     const nodes = [cnode(110, 38), cnode(110, 38), cnode(110, 38), cnode(110, 38), cnode(110, 38), cnode(110, 38), group(), group()];
     nodes[0].parent = 7;
     for (let i = 1; i < 6; i++) nodes[i].parent = 6;

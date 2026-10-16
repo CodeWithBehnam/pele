@@ -13,17 +13,13 @@ const MAX_HOPS = 10000;
 const ROUTE_BUDGET = 2000000;
 // Parallel lines closer than this are drawn as one.
 const NEAR = 4;
-// A handoff with a simple route frees room, so the lanes are laid out again: at most this many
-// times, and only when routing is this far inside its budget.
 const ROUNDS = 3;
 const RELAY = 8;
-// How far from a corner a handoff starts to turn.
 const TURN = 20;
 // The room a lane keeps beside a handoff along its margin, and how much of it is between the
 // handoff and the lane's items.
 const MARGIN = 20;
 const LEG = 14;
-// How much closer two ranks sit when nothing needs the room between them.
 const CLOSE = 3;
 
 export function laneLayout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: LayeredOptions, lanePad = LANE_PAD): CompoundResult {
@@ -95,7 +91,6 @@ export function laneLayout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: Layere
   // Lays the ranked items out and routes the relations. A plain relation is a handoff that takes
   // a simple route of its own, and so keeps no room through the ranks it passes.
   const place = (plain: Uint8Array, margins: Uint8Array): { width: number; height: number; routed: Uint8Array; margins: Uint8Array; work: number } => {
-    // A lane with a handoff along its margin keeps room there for the handoff to turn in.
     const pad = lanePads.map((room, lane) => (margins[lane] ? Math.max(room, MARGIN) : room));
     const used = new Uint8Array(laneCount);
     // Items: the real ones, then a dummy for every rank an edge passes through.
@@ -481,7 +476,6 @@ export function laneLayout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: Layere
         }
         return count;
       };
-      // How many other relations start or end at a point.
       const meets = (x: number, y: number, ei: number): number => {
         let count = 0;
         for (let i = 0; i < edges.length; i++) {
@@ -517,7 +511,6 @@ export function laneLayout(nodes: CNode[], edges: CEdge[], dir: Dir, opt: Layere
         if (LANE[a] === LANE[b] || Math.abs(C[b] - C[a]) < 1) continue;
         const ac = C[a], bc = C[b], aa = amid(a), ba = amid(b);
         const dc = Math.sign(bc - ac), da = Math.sign(ba - aa);
-        // Takes the route when it and its label are clear of everything else.
         const attempt = (pts: number[], margin: number): boolean => {
           for (let p = 2; p < pts.length; p += 2) {
             if (!clear(Math.min(pts[p - 2], pts[p]) - margin, Math.min(pts[p - 1], pts[p + 1]) - margin,

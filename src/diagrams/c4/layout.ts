@@ -121,7 +121,6 @@ function rows(boxes: Box[], perRow: number, gapX: number, gapY: number, stretch:
 
 // Mermaid's grid: in each boundary, its shapes in rows of c4ShapeInRow, then the boundaries inside it
 // in rows of c4BoundaryInRow, each sized around its own content.
-// `room` is the width a narrow drawing has, with `gap` between its columns; undefined lays it out as Mermaid does.
 export function layoutC4(db: C4Db, measurer: TextMeasurer, size: number, small: number, room: number | undefined, gap: number): Layout {
   const groupPad = room === undefined ? GROUP_PAD : 12;
   const groups = new Map<C4Boundary, Group>();

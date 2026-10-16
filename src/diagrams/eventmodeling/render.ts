@@ -248,7 +248,6 @@ function draw(model: EventModelingModel, _config: Config, options: RenderOptions
 }
 
 const RAIL_GAP = 8;
-// What a card keeps when rails take the room, and what a heading leaves for an arrow beside it.
 const CARD_MIN = 120;
 const ARROW_ROOM = 20;
 

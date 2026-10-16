@@ -41,7 +41,6 @@ const resize = (target: HTMLElement, clientWidth: number): void => {
   for (const observer of observers) if (observer.connected && observer.element === (target as unknown)) observer.fire();
 };
 const options = { measurer: metricsMeasurer };
-// The library's own functions, with every render reported.
 const spying = (seen: (o: RenderOptions) => void, parsed?: () => void): Engine => ({
   parse(text, o) {
     parsed?.();
@@ -52,7 +51,6 @@ const spying = (seen: (o: RenderOptions) => void, parsed?: () => void): Engine =
     return render(model, { ...o, measurer: metricsMeasurer });
   },
 });
-// A document's fonts as mount() reads them: whether any are loading, and a promise for when none are.
 const fontSet = () => {
   let finish = (): void => {};
   const fonts = {
@@ -165,7 +163,6 @@ describe('mount', () => {
     const spy = spying((o) => seen.push(o.fontFamily ?? ''));
     mountWith(spy, element(500), FLOW);
     mountWith(spy, element(500), FLOW, { fontFamily: 'Georgia' });
-    // Each mount draws twice here: once to learn the natural size, once for the room.
     expect([...new Set(seen)]).toEqual(['Inter', 'Georgia']);
   });
 
@@ -228,13 +225,11 @@ describe('mount', () => {
     await fonts.loaded();
     expect(seen.length).toBeGreaterThan(drawn);
     expect(renders).toBe(1);
-    // Fonts that load after it was drawn while none were loading leave it alone.
     let after = seen.length;
     fonts.loading();
     await fonts.loaded();
     handle.refresh();
     expect(seen.length).toBe(after);
-    // A diagram that was stopped does not wait for fonts.
     fonts.loading();
     handle.refresh();
     after = seen.length;
@@ -308,7 +303,6 @@ describe('mount', () => {
     handle.destroy();
   });
 
-  // A document with fonts, and elements to mount in it.
   const page = () => {
     const set = fontSet();
     const ownerDocument = { fonts: set.fonts };
@@ -348,7 +342,6 @@ describe('mount', () => {
       }
     };
     drop();
-    // Nor one dropped, or stopped and dropped, while fonts are loading, before they have loaded.
     doc.fonts.loading();
     drop();
     drop(true);
@@ -385,7 +378,6 @@ describe('mount', () => {
     globals.getComputedStyle = () => ({ fontFamily: '', paddingLeft: '0px', paddingRight: '0px', getPropertyValue: () => '' });
     seen.length = 0;
     handle.update(FLOW.replace('Seven', 'Eight'));
-    // There are no fonts to draw it with there. What is drawn is a guess, so that the text shows.
     expect([...new Set(seen)]).toEqual(['undefined|undefined']);
     expect(el.innerHTML).toContain('Eight');
     globals.getComputedStyle = () => ({ fontFamily: 'Georgia', paddingLeft: '0px', paddingRight: '0px', getPropertyValue: () => '' });
@@ -400,7 +392,6 @@ describe('mount', () => {
     const el = element(1000);
     const handle = mount(el, SANKEY, options);
     expect(() => handle.update('flowchart LR\n  A -->')).toThrow(PeleError);
-    // What is shown is still fitted to the room there is.
     resize(el, 340);
     expect(handle.result.width).toBe(320);
     expect(el.innerHTML).toBe(render(SANKEY, { ...options, maxWidth: 320 }).svg);
@@ -418,7 +409,6 @@ describe('mount', () => {
     fail = true;
     expect(() => handle.update(FLOW)).toThrow('host');
     fail = false;
-    // The element, the result and what a later draw starts from all agree.
     expect(handle.result.type).toBe('flowchart');
     expect(el.innerHTML).toBe(handle.result.svg);
     handle.refresh();
@@ -446,7 +436,6 @@ describe('mount', () => {
     el.ownerDocument = second;
     seen.length = 0;
     observers[0].fire();
-    // An observer from the first window: the diagram is now observed from the second.
     expect([...new Set(seen)]).toEqual(['Inter']);
     expect(observers.map((observer) => observer.connected)).toEqual([false, true]);
   });
@@ -470,7 +459,6 @@ describe('mount', () => {
     const el = element(1000);
     const seen: string[] = [];
     const handle = mountWith(spying((o) => seen.push(o.fontFamily ?? '')), el, SANKEY);
-    // One observer for the diagram and its zoom.
     expect(observers.length).toBe(1);
     seen.length = 0;
     handle.refresh();
@@ -500,7 +488,6 @@ describe('mount', () => {
     handle.update(FLOW);
     expect(seen).toEqual([]);
     expect(handle.result.type).toBe('sankey');
-    // Text that cannot be parsed still throws at once.
     expect(() => handle.update('flowchart LR\n  A -->')).toThrow(PeleError);
     resize(el, 500);
     expect([...new Set(seen)]).toEqual(['Inter']);
@@ -521,7 +508,6 @@ describe('mount', () => {
     expect(seen).toEqual([]);
     resize(el, 500);
     expect(seen.length).toBeGreaterThan(0);
-    // Once.
     seen.length = 0;
     resize(el, 500);
     expect(seen).toEqual([]);
@@ -542,7 +528,6 @@ describe('mount', () => {
     expect(errors.length).toBe(1);
     expect(el.innerHTML).toBe(before);
     expect(handle.result.type).toBe('sankey');
-    // Not tried again until something changes.
     resize(el, 500);
     expect(errors.length).toBe(1);
   });

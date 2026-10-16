@@ -299,7 +299,6 @@ const TYPE_DESCRIPTIONS = new Map([
 // Info only prints a version number, which is not much of an example.
 const UNLISTED = new Set(['info']);
 
-// Types that show one example on the Examples page.
 const SINGLE = new Set(['cynefin']);
 
 const FIRST_LIMIT = 500;

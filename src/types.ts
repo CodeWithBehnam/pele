@@ -28,8 +28,6 @@ export interface RenderOptions {
   // Schemes a link or an image may use besides a relative address.
   linkSchemes?: string[];
   imageSchemes?: string[];
-  // Whether a diagram may have links, and whether it may show images. `false` leaves them out
-  // whatever their address, for a host that shows a file nobody has vouched for.
   links?: boolean;
   images?: boolean;
   // Link `rel` attribute. Defaults to `noopener`; an empty string omits it.

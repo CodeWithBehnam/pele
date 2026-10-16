@@ -45,7 +45,6 @@ describe('zoom frame', () => {
   });
 });
 
-// An element holding a drawing 1200 wide that is shown `shown` wide, and the listeners it has.
 const drawingIn = (shown: number) => {
   const listening = new Map<string, number>();
   const handlers = new Map<string, (event: unknown) => void>();
@@ -124,7 +123,6 @@ describe('zoom', () => {
     shrunk.svg.matches = () => true;
     shrunk.fire('focusin', { target: shrunk.svg });
     expect(style.outline).toBe('');
-    // Safari before 15.4 throws on a selector it does not know.
     shrunk.svg.style = {};
     shrunk.svg.matches = () => {
       throw new SyntaxError("':focus-visible' is not a valid selector");

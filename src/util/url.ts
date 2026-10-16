@@ -98,8 +98,6 @@ export function imageUrl(url: string, options: RenderOptions): string | undefine
   return options.images === false ? undefined : allow(url, options.imageSchemes ?? IMAGE_SCHEMES);
 }
 
-// Puts a link around part of a drawing and reports it. An address that is refused makes no
-// link: the part is drawn as it would be without one.
 export function linked(body: string, url: string, id: string, links: LinkInfo[], options: RenderOptions, attrs = ''): string {
   const href = linkUrl(url, options);
   if (href === undefined) return body;

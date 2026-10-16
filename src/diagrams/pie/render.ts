@@ -105,7 +105,6 @@ function draw(model: PieModel, config: Config, options: RenderOptions, radius: n
   let labels = '';
   let outside = '';
   let angle = 0;
-  // Labels outside the rim, each moved on along it until it clears those placed before.
   const rim = radius + OUTSIDE / 2;
   const placedOutside: { x: number; y: number; width: number }[] = [];
   const clear = (x: number, y: number, width: number): boolean =>

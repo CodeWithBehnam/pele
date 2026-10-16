@@ -81,7 +81,6 @@ function context(): Context2D | null {
 
 const MAX_CACHED = 20000;
 
-// The fonts the canvas draws with.
 function canvasFonts(): FontFaceSet | undefined {
   const g = globalThis as { document?: { fonts?: FontFaceSet }; fonts?: FontFaceSet };
   return g.document?.fonts ?? g.fonts;

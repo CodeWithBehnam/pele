@@ -44,7 +44,6 @@ export function literalLabel(text: string, measurer: TextMeasurer, size: number,
   return { lines: lines.map((line, i) => [{ text: line, style, width: widths[i] }]), widths, width, height: lines.length * lineHeight, size, lineHeight };
 }
 
-// Preserve markup and icon spans when a word itself exceeds the mobile label budget.
 export function breakLabel(label: Label, measurer: TextMeasurer, room: number): Label {
   if (label.width <= room) return label;
   const lines: Label['lines'] = [], widths: number[] = [];

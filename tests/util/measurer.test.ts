@@ -3,7 +3,6 @@ import { canvasMeasurer } from '../../src/text/measurer.js';
 
 const globals = globalThis as Record<string, unknown>;
 
-// A canvas whose text is wider once its font has loaded, as a web font is after its fallback.
 const page = () => {
   const state = { loaded: false, measured: 0, faces: 1 };
   globals.OffscreenCanvas = class {

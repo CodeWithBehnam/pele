@@ -116,7 +116,6 @@ describe('flowchart rendering', () => {
     );
     expect(result.svg).toContain('<a href="https://example.com/" target="_blank" rel="noopener">');
     expect(result.svg).toContain('<title>A tooltip</title>');
-    // A refused address makes no link at all: one to a blank page would still navigate.
     expect(result.svg.match(/<a\b/g)).toHaveLength(1);
     expect(result.svg).not.toContain('about:blank');
     expect(result.svg).not.toContain('doSomething');

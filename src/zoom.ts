@@ -78,7 +78,6 @@ export function enableZoom(element: HTMLElement, options: ZoomOptions = {}): Zoo
   return zoomWith(element, options, true);
 }
 
-// A zoom that observes its element's size, or one whose host calls resized() when it changes.
 export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: boolean): Zoom & { resized(): void } {
   let svg: SVGSVGElement | null = null;
   let natural = { width: 0, height: 0 };
@@ -230,7 +229,6 @@ export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: bo
     if (scale !== 0) place(x - dx / scale, y - dy / scale);
   };
 
-  // The size that fits changes with the element's size. An enlarged drawing goes back to it.
   const resized = (): void => {
     watch();
     const size = element.clientWidth + element.clientHeight;
@@ -238,7 +236,6 @@ export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: bo
     watched = size;
     settle();
   };
-  // Watched from the window the element is in now, which changes if a host moves it to another.
   let observer: ResizeObserver | undefined;
   let observed: typeof globalThis | undefined;
   const watch = (): void => {
@@ -361,7 +358,6 @@ export function zoomWith(element: HTMLElement, options: ZoomOptions, observe: bo
     try {
       visible = svg.matches(':focus-visible');
     } catch {
-      // The ring is the browser's default.
     }
     svg.style.outline = visible ? '' : 'none';
   };

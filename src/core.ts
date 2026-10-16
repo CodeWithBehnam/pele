@@ -56,7 +56,6 @@ interface Parsed {
   config: Config;
 }
 
-// What parse() learned besides the model it returns, for a render() that is given the model.
 const parsedModels = new WeakMap<object, Parsed>();
 
 function parseSource(
@@ -107,8 +106,6 @@ export function supports(text: string): boolean {
 // nothing left to do with them.
 export type ParseOptions = Pick<RenderOptions, 'limit' | 'maxEdges' | 'config'>;
 
-// The model can be given to render() in place of the text, any number of times, so that a
-// diagram drawn again for another width or font is not parsed again.
 export function parse(text: string, options: ParseOptions = {}): DiagramModel {
   return guarded(() => {
     const parsed = parseSource(text, options.limit, options.maxEdges, options.config);

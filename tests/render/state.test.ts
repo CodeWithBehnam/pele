@@ -255,7 +255,6 @@ describe('state diagram rendering', () => {
     );
     expect(result.svg).toContain('<a href="https://example.com/x" target="_blank" rel="noopener"><title>Go there</title>');
     expect(result.svg).toContain('<a href="https://example.org/" target="_blank" rel="noopener">');
-    // The refused address makes no link. Its tooltip stays.
     expect(result.svg.match(/<a\b/g)).toHaveLength(2);
     expect(result.svg).toContain('<title>no</title>');
     expect(result.links).toEqual([

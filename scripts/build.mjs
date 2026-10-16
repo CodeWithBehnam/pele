@@ -19,7 +19,6 @@ const shared = {
 // One file with every diagram type.
 await build({ ...shared, entryPoints: ['src/index.ts'], outfile: 'dist/pele.js' });
 
-// The same, as a script for a <script> tag.
 await build({ ...browserBuild, outfile: 'dist/pele.global.js' });
 
 // The same code in pieces: a core, one entry per diagram type, and a loader that fetches a type

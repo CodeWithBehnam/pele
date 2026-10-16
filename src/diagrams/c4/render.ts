@@ -16,7 +16,6 @@ import { HEAD_LEFT, HEAD_TOP, layoutC4 } from './layout.js';
 import { HEAD, LANE, Lanes, crosses, cylRy, queueRx, route, type Box } from './route.js';
 
 const PAIR_SHIFT = 7;
-// The gap between columns in a narrow drawing, and how much it grows at a time when its lanes need more.
 const NARROW_GAP = 36;
 const WIDEN = 24;
 const MAX_OFFSET = 2000;
@@ -44,8 +43,6 @@ function link(body: string, url: string | undefined, id: string, links: LinkInfo
 export function renderC4(db: C4Db, _config: Config, options: RenderOptions): Rendered {
   return tighten(options, (tight) => {
     if (!tight) return draw(db, _config, options, false)[0];
-    // A narrow drawing sets its columns close together. Where the relations between them need more
-    // lanes than that leaves room for, the columns are set further apart, a step at a time.
     let [best, squeezed] = draw(db, _config, options, true, NARROW_GAP);
     for (let gap = NARROW_GAP + WIDEN; squeezed > 0 && gap <= NARROW_GAP + 3 * WIDEN; gap += WIDEN) {
       const [wider, left] = draw(db, _config, options, true, gap);

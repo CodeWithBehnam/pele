@@ -196,7 +196,6 @@ function connect(a: Box, b: Box, shift: number): [number, number, number, number
 // reads as part of it.
 const NEAR = 6;
 const FRAME_NEAR = 3;
-// How far apart two lines leave or reach the same side of a shape.
 const PORT_STEP = 12;
 
 // What the routes drawn so far take up, so that the next keeps apart from them: upright stretches
@@ -210,7 +209,6 @@ export class Lanes {
   // runs along another.
   squeezed = 0;
 
-  // Whether a stretch at `at` from a0 to a1 keeps clear of those already running the same way.
   free(upright: boolean, at: number, a0: number, a1: number): boolean {
     const lo = Math.min(a0, a1);
     const hi = Math.max(a0, a1);
@@ -221,7 +219,6 @@ export class Lanes {
     return !near(upright ? this.upright : this.level, NEAR) && !near(this.frames[upright ? 0 : 1], FRAME_NEAR);
   }
 
-  // How many stretches already drawn the line through `points` crosses.
   crossings(points: number[]): number {
     let count = 0;
     for (let i = 2; i < points.length; i += 2) {
@@ -237,7 +234,6 @@ export class Lanes {
     return count;
   }
 
-  // A boundary's frame: a lane does not run along it, where it would read as part of the frame.
   frame(box: Box): void {
     this.frames[0].push(box.x, box.y, box.y + box.h, box.x + box.w, box.y, box.y + box.h);
     this.frames[1].push(box.y, box.x, box.x + box.w, box.y + box.h, box.x, box.x + box.w);
@@ -272,8 +268,6 @@ export class Lanes {
   }
 }
 
-// A path through `points` along upright and level stretches, with rounded corners, trimmed at each
-// end for its markers.
 function path(points: number[], startTrim: number, endTrim: number): string {
   const n = points.length;
   const ux = Math.sign(points[2] - points[0]);
@@ -298,7 +292,6 @@ function path(points: number[], startTrim: number, endTrim: number): string {
   return d + (lx ? 'H' + num(points[n - 2] - lx * endTrim) : 'V' + num(points[n - 1] - ly * endTrim));
 }
 
-// Whether the stretches through `points` keep clear of every shape but the two they join.
 function clearOf(points: number[], others: Box[], a: Box, b: Box): boolean {
   for (const other of others) {
     if (other !== a && other !== b && crosses(points, other.x, other.y, other.x + other.w, other.y + other.h)) return false;
@@ -333,8 +326,6 @@ function bent(points: number[], along: number, startTrim: number, endTrim: numbe
   };
 }
 
-// The places for a lane across a gap from lo to hi: the middle first, then further out either way,
-// spread with the gap so that lanes side by side are easy to tell apart.
 function across(lo: number, hi: number): number[] {
   const out: number[] = [];
   const mid = (lo + hi) / 2;
@@ -346,9 +337,6 @@ function across(lo: number, hi: number): number[] {
   return out;
 }
 
-// A relation between shapes in neither the same column nor the same row, whose straight line would
-// pass behind another shape: it turns twice instead, through the gap between their columns or
-// between their rows, whichever crosses fewer lines. Undefined when neither way is clear.
 function elbow(a: Box, b: Box, others: Box[], lanes: Lanes, startTrim: number, endTrim: number): Route | undefined {
   const ax = a.x + a.w / 2;
   const ay = a.y + a.h / 2;
@@ -465,8 +453,6 @@ export function route(
     lanes.squeezed++;
   }
   if (others && blocked && (upright || sy === ey)) {
-    // The line would pass behind the shapes between two in the same column or row.
-    // Go around them instead: out of one side, along the gap beside them, and back in.
     const laneOn = (forward: boolean): number => {
       let lane = forward ? -Infinity : Infinity;
       const widen = (box: Box): void => {
@@ -480,7 +466,6 @@ export function route(
       }
       return lane;
     };
-    // Whether nothing lies beyond a lane over the stretch it runs, so that it runs along the outside.
     const lo = upright ? Math.min(a.y, b.y) : Math.min(a.x, b.x);
     const hi = upright ? Math.max(a.y + a.h, b.y + b.h) : Math.max(a.x + a.w, b.x + b.w);
     const outside = (forward: boolean, lane: number): boolean => {
