@@ -12,6 +12,12 @@ Documentation, examples, and a playground are at [pele.run](https://pele.run).
 npm install pele
 ```
 
+Or with [Bun](https://bun.sh):
+
+```sh
+bun add pele
+```
+
 ## Use
 
 ```ts
@@ -85,6 +91,17 @@ npm test
 npm run build
 npm run bench
 ```
+
+Or with Bun:
+
+```sh
+bun install
+bun run test
+bun run build
+bun run bench
+```
+
+Use `bun run test`, not `bun test`. `bun test` starts Bun's own test runner instead of Vitest. The scripts run on Node, so keep Node 20 or later installed.
 
 The documentation site and playground are in `website/` and use Node 24 and pnpm 12. With nvm:
 

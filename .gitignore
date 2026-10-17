@@ -1,5 +1,6 @@
 AGENTS.md
 node_modules/
+bun.lock
 dist/
 .wrangler/
 .DS_Store
