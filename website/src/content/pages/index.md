@@ -40,13 +40,13 @@ Use CSS variables to set colors and fonts. Color changes apply without re-render
 
 ## Why Pele?
 
-Zero runtime dependencies, 6× smaller, and up to 500× faster than Mermaid.js. Pele supports every diagram type built into Mermaid 12.1.0.
+Zero dependencies, 6× smaller, and up to 500× faster than Mermaid.js. Pele supports every diagram type built into Mermaid 12.1.0.
 
 | | Pele | Mermaid.js |
 | --- | --- | --- |
 | Bundle size gzip | 230 kB | 1.6 MB |
 | Render time | 0.05–0.3 ms | 6–82 ms |
-| Runtime dependencies | None | 23 |
+| Direct dependencies | 0 | 23 |
 | Small screens | Adapts the layout | Scales the diagram |
 | Theming | CSS variables | Theme configuration |
 
