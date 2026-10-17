@@ -20,6 +20,7 @@ Switch between light and dark colors without re-rendering the diagram.
 | `--pele-border` | `#8a8a8a` | Node and subgraph borders |
 | `--pele-accent` | `#5b7bd5` | Highlights |
 | `--pele-critical` | `#e45756` | Critical tasks in a Gantt chart, high priorities in a kanban |
+| `--pele-error` | `#e45756` | Errors that [`mount()`](/api#mount) shows |
 | `--pele-font` | Measured font | Label font. See [Fonts](#fonts) |
 | `--pele-font-mono` | Measured font | Monospace labels |
 | `--pele-title-weight` | `bold` | Diagram title |

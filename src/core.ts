@@ -134,8 +134,8 @@ export function render(source: string | DiagramModel, options: RenderOptions = {
   });
 }
 
-// Renders into an element and draws again when the element's width calls for it. Throws as
-// render() does when the text cannot be drawn.
+// Renders into an element and draws again when the element's width calls for it. Text that
+// cannot be drawn shows its error in the element.
 export function mount(element: HTMLElement, text: string, options: MountOptions = {}): Mounted {
   return mountWith({ parse, render }, element, text, options);
 }

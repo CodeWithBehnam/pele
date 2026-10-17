@@ -89,7 +89,7 @@ All options are optional.
 | `fontFamily` | `string` | Label font. Defaults to `sans-serif`. See [Fonts](/theming#fonts). |
 | `fontFamilyMono` | `string` | Monospace label font. Defaults to `monospace`. |
 | `fontSize` | `number` | Base font size in pixels. Defaults to `16`. |
-| `idPrefix` | `string` | Prefix for accessibility title and description IDs. Use a unique prefix for each diagram on a page. |
+| `idPrefix` | `string` | Prefix for accessibility title and description IDs. Use a unique prefix for each diagram on a page. `mount()` gives each diagram its own by default. |
 | `responsive` | `boolean` | Allows the SVG to shrink to fit its container. Defaults to `true`. Set `false` for a fixed pixel size. |
 | `maxWidth` | `number` | Available width in pixels. See [Narrow screens](#narrow-screens). |
 | `autoDirection` | `boolean` | Allows supported diagrams to switch to a vertical layout. Defaults to `true`. |
@@ -159,6 +159,8 @@ Use `update()` to change the source:
 diagram.update('flowchart LR\n  A[Draft] --> B[Published]');
 ```
 
+`mount()` and `update()` don't throw when the text can't be drawn. The container shows the error instead: over the bottom edge of the last diagram, which is dimmed, or in place of a diagram if none could be drawn yet. Read it from `error`, or handle it with `onError`. Its color is [`--pele-error`](/theming).
+
 Call `refresh()` after changing fonts or moving the container. Resizes and pending web fonts are handled automatically.
 
 Use a container whose width does not depend on the diagram, such as a block element.
@@ -169,12 +171,14 @@ Use a container whose width does not depend on the diagram, such as a block elem
 | --- | --- | --- |
 | `onRender` | `(result: RenderResult) => void` | Called after each render. Use it to attach link handlers or other SVG interactions. |
 | `zoom` | `boolean \| 'auto' \| ZoomOptions` | Defaults to `'auto'`: enables zoom when the diagram shrinks to fit. Use `true` to always enable zoom, `false` to disable it, or [`ZoomOptions`](#zoom) to configure it. |
-| `onError` | `(error: unknown) => void` | Handles errors from automatic redraws. |
+| `onError` | `(error: unknown) => void` | Called when the text can't be drawn, or an automatic redraw fails. |
 | `sanitize` | `(svg: string) => Node` | Passes each SVG through your app's sanitizer before insertion. By default, the SVG is inserted as HTML. |
 
 | Member | Description |
 | --- | --- |
-| `result` | Current `RenderResult`. |
+| `result` | Current `RenderResult`, or `undefined` if nothing could be drawn yet. |
+| `source` | The text last given, whether or not it could be drawn. |
+| `error` | Why that text couldn't be drawn, or `undefined`. |
 | `zoom` | The diagram's [`Zoom`](#zoom), or `undefined` if the `zoom` option is `false`. |
 | `update(text, options?)` | Updates the source and optionally replaces the options. Hidden diagrams may wait until visible to redraw. |
 | `refresh()` | Re-renders if the container width or the fonts have changed since the last render. |

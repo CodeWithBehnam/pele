@@ -280,13 +280,20 @@ describe('mount', () => {
 
   it('updates, reports errors as render does, and stops when destroyed', () => {
     const el = element(340);
-    const handle = mount(el, SANKEY, options);
+    const errors: unknown[] = [];
+    const handle = mount(el, SANKEY, { ...options, onError: (error) => errors.push(error) });
     handle.update(FLOW);
-    expect(handle.result.type).toBe('flowchart');
+    expect(handle.result?.type).toBe('flowchart');
     expect(el.innerHTML).toBe(render(FLOW, { ...options, maxWidth: 320 }).svg);
-    expect(() => handle.update('flowchart LR\n  A -->')).toThrow(PeleError);
+    handle.update('flowchart LR\n  A -->');
+    expect(handle.error).toBeInstanceOf(PeleError);
+    expect(errors).toEqual([handle.error]);
+    expect(handle.source).toBe('flowchart LR\n  A -->');
+    expect(handle.result?.type).toBe('flowchart');
     expect(el.innerHTML).toBe(render(FLOW, { ...options, maxWidth: 320 }).svg);
-    expect(() => mount(element(300), 'not a diagram', options)).toThrow(PeleError);
+    const nothing = mount(element(300), 'not a diagram', options);
+    expect(nothing.result).toBeUndefined();
+    expect(nothing.error).toBeInstanceOf(PeleError);
 
     handle.update(SANKEY);
     handle.destroy();
@@ -388,13 +395,143 @@ describe('mount', () => {
     expect(el.innerHTML).toContain('Eight');
   });
 
+  // Just enough of a document for the error: elements to make, add and take away.
+  const shown = () => {
+    interface Node { name: string; style: Record<string, string>; attributes: Record<string, string>; className: string; textContent: string; title: string; parentNode: unknown; remove(): void; setAttribute(k: string, v: string): void; removeAttribute(k: string): void }
+    const children: Node[] = [];
+    const make = (name: string): Node => ({
+      name,
+      style: {},
+      attributes: {},
+      className: '',
+      textContent: '',
+      title: '',
+      parentNode: null,
+      remove() {
+        const at = children.indexOf(this);
+        if (at >= 0) children.splice(at, 1);
+        this.parentNode = null;
+      },
+      setAttribute(k, v) {
+        this.attributes[k] = v;
+      },
+      removeAttribute(k) {
+        delete this.attributes[k];
+      },
+    });
+    const el = {
+      clientWidth: 1000,
+      children,
+      ownerDocument: { createElement: make },
+      get firstElementChild() {
+        return children[0] ?? null;
+      },
+      append(node: Node) {
+        node.remove();
+        children.push(node);
+        node.parentNode = el;
+      },
+      replaceChildren(...nodes: Node[]) {
+        for (const node of children) node.parentNode = null;
+        children.splice(0, children.length, ...nodes);
+        for (const node of nodes) node.parentNode = el;
+      },
+      addEventListener() {},
+      removeEventListener() {},
+    };
+    const sanitize = (svg: string) => Object.assign(make('svg'), { textContent: svg }) as unknown as globalThis.Node;
+    return { el: el as unknown as HTMLElement, children, sanitize };
+  };
+
+  it('shows the error over the last drawing, dimmed, until the text can be drawn', () => {
+    const { el, children, sanitize } = shown();
+    const handle = mount(el, FLOW, { ...options, sanitize });
+    expect(children.map((node) => node.name)).toEqual(['svg']);
+    handle.update('flowchart LR\n  A -->');
+    expect(children.map((node) => node.name)).toEqual(['svg', 'div']);
+    const [drawing, error] = children;
+    expect(drawing.style.opacity).toBe('0.4');
+    expect(error.className).toBe('pele pele-error');
+    expect(error.textContent).toBe("Parse error on line 3: Expecting 'NODE_STRING', got 'EOF'");
+    expect(error.title).toBe((handle.error as Error).message);
+    expect(error.attributes.style).toContain('margin-top:-1.3em');
+    // A drawing for another width keeps it.
+    resize(el, 300);
+    expect(children.map((node) => node.name)).toEqual(['svg', 'div']);
+    expect(children[0]).not.toBe(drawing);
+    expect(children[0].style.opacity).toBe('0.4');
+    handle.update(SANKEY);
+    expect(children.map((node) => node.name)).toEqual(['svg']);
+    expect(children[0].style.opacity).toBe('');
+  });
+
+  it('shows the whole error in place of a diagram that could not be drawn at all', () => {
+    const { el, children, sanitize } = shown();
+    const errors: unknown[] = [];
+    const handle = mount(el, 'sequenceDiagram\n  A->>', { ...options, sanitize, onError: (error) => errors.push(error) });
+    expect(handle.result).toBeUndefined();
+    expect(errors).toEqual([handle.error]);
+    expect(children.map((node) => node.name)).toEqual(['div']);
+    expect(children[0].textContent).toBe((handle.error as Error).message);
+    expect(children[0].attributes.style).toContain('white-space:pre-wrap');
+    resize(el, 300);
+    expect(errors.length).toBe(1);
+    handle.update(SANKEY);
+    expect(children.map((node) => node.name)).toEqual(['svg']);
+    expect(handle.result?.type).toBe('sankey');
+  });
+
+  it('keeps the error of text that could not be drawn while hidden, at any width', () => {
+    const el = element(1000);
+    const handle = mount(el, SANKEY, options);
+    const before = el.innerHTML;
+    resize(el, 0);
+    handle.update('sankey\n\nA,B,10\nB,A,10\n');
+    resize(el, 1000);
+    expect(handle.error).toBeInstanceOf(PeleError);
+    resize(el, 1100);
+    expect(handle.error).toBeInstanceOf(PeleError);
+    expect(el.innerHTML).toBe(before);
+    handle.update(FLOW);
+    expect(handle.error).toBeUndefined();
+  });
+
+  it('takes the options given with text that cannot be drawn', () => {
+    const el = element(1000);
+    const first: unknown[] = [];
+    const second: unknown[] = [];
+    const handle = mount(el, SANKEY, { ...options, zoom: false, onError: (error) => first.push(error) });
+    handle.update('flowchart LR\n  A -->', { ...options, zoom: true, onError: (error) => second.push(error) });
+    expect(first).toEqual([]);
+    expect(second.length).toBe(1);
+    expect(handle.zoom).toBeDefined();
+    handle.update('sankey\n\nA,B,10\nB,A,10\n', { ...options, zoom: false, onError: (error) => second.push(error) });
+    expect(second.length).toBe(2);
+    expect(handle.zoom).toBeUndefined();
+  });
+
+  it('gives each diagram its own ids', () => {
+    const text = 'flowchart LR\n  accTitle: Steps\n  A --> B';
+    const first = mount(element(500), text, options).result!.svg;
+    const second = mount(element(500), text, options).result!.svg;
+    const ids = (svg: string) => [...svg.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
+    expect(ids(first).length).toBeGreaterThan(0);
+    expect(ids(first).filter((id) => ids(second).includes(id))).toEqual([]);
+    expect(mount(element(500), text, { ...options, idPrefix: 'own' }).result!.svg).toContain('id="own-title"');
+  });
+
   it('keeps the text it had when other text cannot be drawn', () => {
     const el = element(1000);
     const handle = mount(el, SANKEY, options);
-    expect(() => handle.update('flowchart LR\n  A -->')).toThrow(PeleError);
+    handle.update('flowchart LR\n  A -->');
     resize(el, 340);
-    expect(handle.result.width).toBe(320);
+    expect(handle.result?.width).toBe(320);
     expect(el.innerHTML).toBe(render(SANKEY, { ...options, maxWidth: 320 }).svg);
+    // The error stays with its text, however often that text is given.
+    handle.update('flowchart LR\n  A -->');
+    expect(handle.error).toBeInstanceOf(PeleError);
+    handle.update(SANKEY);
+    expect(handle.error).toBeUndefined();
   });
 
   it('lets the new drawing stand when it is the host\'s onRender that throws', () => {
@@ -488,7 +625,8 @@ describe('mount', () => {
     handle.update(FLOW);
     expect(seen).toEqual([]);
     expect(handle.result.type).toBe('sankey');
-    expect(() => handle.update('flowchart LR\n  A -->')).toThrow(PeleError);
+    handle.update('flowchart LR\n  A -->');
+    expect(handle.error).toBeInstanceOf(PeleError);
     resize(el, 500);
     expect([...new Set(seen)]).toEqual(['Inter']);
     expect(handle.result.type).toBe('flowchart');
